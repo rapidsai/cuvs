@@ -81,11 +81,16 @@ struct search_params : cuvs::neighbors::search_params {
  * The index stores the codes of a binary-quantized dataset (see `device_binary_dataset_view`),
  * together with the quantizer that produced them. Queries must be supplied as bit-packed bytes.
  * Neighbors are returned with their Hamming distances, i.e. the number of differing bits.
+ *
+ * @tparam IdxT type of the indices in the source dataset
  */
+template <typename IdxT = int64_t>
 struct index : cuvs::neighbors::index {
   using index_params_type  = ivf_binary::index_params;
   using search_params_type = ivf_binary::search_params;
-  using index_type         = int64_t;
+  using index_type         = IdxT;
+  static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
+                "IdxT must be able to represent all values of uint32_t");
 
  public:
   index(const index&)            = delete;
@@ -102,12 +107,12 @@ struct index : cuvs::neighbors::index {
 
   /** The number of bits in each vector. */
   uint32_t dim() const noexcept;
-  /** The number of bytes in each encoded vector. */
-  uint32_t encoded_dim() const noexcept;
+  /** The number of bytes used to store each vector. */
+  uint32_t storage_dim() const noexcept;
   /** The number of clusters/inverted lists. */
   uint32_t n_lists() const noexcept;
   /** The total number of vectors in the index. */
-  int64_t size() const noexcept;
+  IdxT size() const noexcept;
   /** Whether `centers()` change upon extending the index. */
   bool adaptive_centers() const noexcept;
   /** Whether the lists are allocated without extra space (see index_params). */
@@ -115,10 +120,10 @@ struct index : cuvs::neighbors::index {
 
   /** Sizes of the lists (clusters) [n_lists]. */
   raft::device_vector_view<const uint32_t, uint32_t> list_sizes() const noexcept;
-  /** Bit-packed cluster centers [n_lists, encoded_dim]. */
+  /** Bit-packed cluster centers [n_lists, storage_dim]. */
   raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> centers() const noexcept;
   /**
-   * Exact number of ones at each bit of the vectors in each cluster [n_lists, 8 * encoded_dim];
+   * Exact number of ones at each bit of the vectors in each cluster [n_lists, 8 * storage_dim];
    * empty unless the centers are adaptive.
    */
   raft::device_matrix_view<const uint32_t, int64_t, raft::row_major> center_counts() const noexcept;
@@ -134,7 +139,7 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<uint8_t, int64_t, raft::row_major> centers_;
   raft::device_matrix<uint32_t, int64_t, raft::row_major> center_counts_;
   // The inverted lists of codes, scanned by the interleaved Hamming kernel of IVF-Flat.
-  ivf_flat::index<uint8_t, int64_t> lists_;
+  ivf_flat::index<uint8_t, IdxT> lists_;
 };
 /** @} */
 
@@ -167,7 +172,7 @@ struct index : cuvs::neighbors::index {
  */
 auto build(raft::resources const& handle,
            const index_params& index_params,
-           device_binary_dataset_view<float, int64_t> dataset) -> index;
+           device_binary_dataset_view<float, int64_t> dataset) -> index<int64_t>;
 
 /**
  * @brief Add bit-packed vectors to the index.
@@ -184,7 +189,7 @@ auto build(raft::resources const& handle,
 void extend(raft::resources const& handle,
             device_binary_dataset_view<float, int64_t> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
-            index* index);
+            index<int64_t>* index);
 /** @} */
 
 /**
@@ -194,21 +199,21 @@ void extend(raft::resources const& handle,
 /**
  * @brief Search the index with bit-packed byte queries using Hamming distance.
  *
- * Each query has `index.encoded_dim()` bytes, with bit `i` stored in bit `i % 8` of byte `i / 8`.
+ * Each query has `index.storage_dim()` bytes, with bit `i` stored in bit `i % 8` of byte `i / 8`.
  * Unused bits in the final byte must be zero. The supplied codes are searched as-is, without
  * quantization or threshold comparisons; choosing the quantizer is the caller's responsibility.
  *
  * @param[in] handle
  * @param[in] params configure the search
  * @param[in] index the index
- * @param[in] queries a device matrix [n_queries, index.encoded_dim()] of bit-packed queries
+ * @param[in] queries a device matrix [n_queries, index.storage_dim()] of bit-packed queries
  * @param[out] neighbors ids of the k nearest neighbors [n_queries, k]
  * @param[out] distances Hamming distances to the neighbors [n_queries, k]
  * @param[in] sample_filter an optional device filter on the dataset ids
  */
 void search(raft::resources const& handle,
             const search_params& params,
-            const index& index,
+            const index<int64_t>& index,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
@@ -225,20 +230,22 @@ void search(raft::resources const& handle,
  *
  * Experimental, both the API and the serialization format are subject to change.
  */
-void serialize(raft::resources const& handle, std::ostream& os, const index& index);
+void serialize(raft::resources const& handle, std::ostream& os, const index<int64_t>& index);
 
 /** Save the index to a file. */
-void serialize(raft::resources const& handle, const std::string& filename, const index& index);
+void serialize(raft::resources const& handle,
+               const std::string& filename,
+               const index<int64_t>& index);
 
 /**
  * Load the index from an input stream.
  *
  * Experimental, both the API and the serialization format are subject to change.
  */
-void deserialize(raft::resources const& handle, std::istream& is, index* index);
+void deserialize(raft::resources const& handle, std::istream& is, index<int64_t>* index);
 
 /** Load the index from a file. */
-void deserialize(raft::resources const& handle, const std::string& filename, index* index);
+void deserialize(raft::resources const& handle, const std::string& filename, index<int64_t>* index);
 /** @} */
 
 }  // namespace ivf_binary

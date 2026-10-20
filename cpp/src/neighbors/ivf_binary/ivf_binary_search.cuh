@@ -42,7 +42,7 @@ inline auto is_local_topk_feasible(uint32_t k) -> bool
 
 template <typename IvfSampleFilterT>
 void search_impl(raft::resources const& handle,
-                 const index& idx,
+                 const index<int64_t>& idx,
                  const uint8_t* queries,
                  uint32_t n_queries,
                  uint32_t queries_offset,
@@ -59,7 +59,7 @@ void search_impl(raft::resources const& handle,
   auto stream                  = raft::resource::get_cuda_stream(handle);
   const auto& lists            = index_access::lists(idx);
   const uint32_t n_lists       = idx.n_lists();
-  const uint32_t dim           = idx.encoded_dim();
+  const uint32_t dim           = idx.storage_dim();
   std::size_t n_queries_probes = std::size_t(n_queries) * std::size_t(n_probes);
 
   // The distance value of cluster(list) and queries
@@ -239,7 +239,7 @@ template <typename IvfSampleFilterT>
 void search_with_filtering(
   raft::resources const& handle,
   const search_params& params,
-  const index& idx,
+  const index<int64_t>& idx,
   raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
   raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
   raft::device_matrix_view<float, int64_t, raft::row_major> distances,
@@ -250,7 +250,7 @@ void search_with_filtering(
     "Number of rows in output neighbors and distances matrices must equal the number of queries.");
   RAFT_EXPECTS(neighbors.extent(1) == distances.extent(1),
                "Number of columns in output neighbors and distances matrices must be equal");
-  RAFT_EXPECTS(queries.extent(1) == idx.encoded_dim(),
+  RAFT_EXPECTS(queries.extent(1) == idx.storage_dim(),
                "Number of query bytes should equal the number of bytes in the index vectors.");
   RAFT_EXPECTS(params.n_probes > 0,
                "n_probes (number of clusters to probe in the search) must be positive.");
@@ -291,7 +291,7 @@ void search_with_filtering(
 
     search_impl<IvfSampleFilterT>(handle,
                                   idx,
-                                  queries.data_handle() + size_t(offset_q) * idx.encoded_dim(),
+                                  queries.data_handle() + size_t(offset_q) * idx.storage_dim(),
                                   queries_batch,
                                   offset_q,
                                   k,
@@ -307,7 +307,7 @@ void search_with_filtering(
 /** Search with the binary-quantized queries; see cuvs::neighbors::ivf_binary::search. */
 inline void search(raft::resources const& handle,
                    const search_params& params,
-                   const index& idx,
+                   const index<int64_t>& idx,
                    raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
                    raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
                    raft::device_matrix_view<float, int64_t, raft::row_major> distances,

@@ -64,6 +64,7 @@ IVF index of bit-packed binary vectors searched with the Hamming distance.
 The index stores the codes of a binary-quantized dataset (see `device_binary_dataset_view`), together with the quantizer that produced them. Queries must be supplied as bit-packed bytes. Neighbors are returned with their Hamming distances, i.e. the number of differing bits.
 
 ```cpp
+template <typename IdxT = int64_t>
 struct index;
 ```
 
@@ -119,13 +120,13 @@ uint32_t dim() const noexcept;
 
 `uint32_t`
 
-<a id="neighbors-ivf-binary-index-encoded-dim"></a>
-### neighbors::ivf_binary::index::encoded_dim
+<a id="neighbors-ivf-binary-index-storage-dim"></a>
+### neighbors::ivf_binary::index::storage_dim
 
-The number of bytes in each encoded vector.
+The number of bytes used to store each vector.
 
 ```cpp
-uint32_t encoded_dim() const noexcept;
+uint32_t storage_dim() const noexcept;
 ```
 
 **Returns**
@@ -151,12 +152,12 @@ uint32_t n_lists() const noexcept;
 The total number of vectors in the index.
 
 ```cpp
-int64_t size() const noexcept;
+IdxT size() const noexcept;
 ```
 
 **Returns**
 
-`int64_t`
+`IdxT`
 
 <a id="neighbors-ivf-binary-index-adaptive-centers"></a>
 ### neighbors::ivf_binary::index::adaptive_centers
@@ -200,7 +201,7 @@ raft::device_vector_view<const uint32_t, uint32_t> list_sizes() const noexcept;
 <a id="neighbors-ivf-binary-index-centers"></a>
 ### neighbors::ivf_binary::index::centers
 
-Bit-packed cluster centers [n_lists, encoded_dim].
+Bit-packed cluster centers [n_lists, storage_dim].
 
 ```cpp
 raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> centers() const noexcept;
@@ -213,7 +214,7 @@ raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> centers() cons
 <a id="neighbors-ivf-binary-index-center-counts"></a>
 ### neighbors::ivf_binary::index::center_counts
 
-Exact number of ones at each bit of the vectors in each cluster [n_lists, 8 * encoded_dim];
+Exact number of ones at each bit of the vectors in each cluster [n_lists, 8 * storage_dim];
 
 ```cpp
 raft::device_matrix_view<const uint32_t, int64_t, raft::row_major> center_counts() const noexcept;
@@ -248,7 +249,7 @@ Build the index from a binary-quantized dataset.
 ```cpp
 auto build(raft::resources const& handle,
 const index_params& index_params,
-device_binary_dataset_view<float, int64_t> dataset) -> index;
+device_binary_dataset_view<float, int64_t> dataset) -> index<int64_t>;
 ```
 
 The thresholds of the dataset dictionary are copied into the index.
@@ -265,7 +266,7 @@ Usage example:
 
 **Returns**
 
-[`index`](/api-reference/cpp-api-neighbors-ivf-binary#neighbors-ivf-binary-index)
+[`index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-binary#neighbors-ivf-binary-index)
 
 <a id="neighbors-ivf-binary-extend"></a>
 ### neighbors::ivf_binary::extend
@@ -276,7 +277,7 @@ Add bit-packed vectors to the index.
 void extend(raft::resources const& handle,
 device_binary_dataset_view<float, int64_t> new_vectors,
 std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
-index* index);
+index<int64_t>* index);
 ```
 
 The supplied codes are used as-is. The dictionary of the new vectors is not compared with or copied into the index; choosing the quantizer is the caller's responsibility.
@@ -288,7 +289,7 @@ The supplied codes are used as-is. The dictionary of the new vectors is not comp
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | [`device_binary_dataset_view<float, int64_t>`](/api-reference/cpp-api-core-dataset-binary#device-binary-dataset-view) | the binary-quantized vectors to add |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | ids of the new vectors; required if the index is not empty, otherwise the ids start from zero |
-| `index` | inout | [`index*`](/api-reference/cpp-api-neighbors-ivf-binary#neighbors-ivf-binary-index) | the index to extend |
+| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-binary#neighbors-ivf-binary-index) | the index to extend |
 
 **Returns**
 
@@ -302,7 +303,7 @@ The supplied codes are used as-is. The dictionary of the new vectors is not comp
 Save the index to an output stream.
 
 ```cpp
-void serialize(raft::resources const& handle, std::ostream& os, const index& index);
+void serialize(raft::resources const& handle, std::ostream& os, const index<int64_t>& index);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
@@ -313,7 +314,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
 | `os` |  | `std::ostream&` |  |
-| `index` |  | [`const index&`](/api-reference/cpp-api-neighbors-ivf-binary#neighbors-ivf-binary-index) |  |
+| `index` |  | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-binary#neighbors-ivf-binary-index) |  |
 
 **Returns**
 
@@ -324,7 +325,9 @@ Experimental, both the API and the serialization format are subject to change.
 Save the index to a file.
 
 ```cpp
-void serialize(raft::resources const& handle, const std::string& filename, const index& index);
+void serialize(raft::resources const& handle,
+const std::string& filename,
+const index<int64_t>& index);
 ```
 
 **Parameters**
@@ -333,7 +336,7 @@ void serialize(raft::resources const& handle, const std::string& filename, const
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
 | `filename` |  | `const std::string&` |  |
-| `index` |  | [`const index&`](/api-reference/cpp-api-neighbors-ivf-binary#neighbors-ivf-binary-index) |  |
+| `index` |  | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-binary#neighbors-ivf-binary-index) |  |
 
 **Returns**
 
@@ -345,7 +348,7 @@ void serialize(raft::resources const& handle, const std::string& filename, const
 Load the index from an input stream.
 
 ```cpp
-void deserialize(raft::resources const& handle, std::istream& is, index* index);
+void deserialize(raft::resources const& handle, std::istream& is, index<int64_t>* index);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
@@ -356,7 +359,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
 | `is` |  | `std::istream&` |  |
-| `index` |  | [`index*`](/api-reference/cpp-api-neighbors-ivf-binary#neighbors-ivf-binary-index) |  |
+| `index` |  | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-binary#neighbors-ivf-binary-index) |  |
 
 **Returns**
 
@@ -367,7 +370,7 @@ Experimental, both the API and the serialization format are subject to change.
 Load the index from a file.
 
 ```cpp
-void deserialize(raft::resources const& handle, const std::string& filename, index* index);
+void deserialize(raft::resources const& handle, const std::string& filename, index<int64_t>* index);
 ```
 
 **Parameters**
@@ -376,7 +379,7 @@ void deserialize(raft::resources const& handle, const std::string& filename, ind
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
 | `filename` |  | `const std::string&` |  |
-| `index` |  | [`index*`](/api-reference/cpp-api-neighbors-ivf-binary#neighbors-ivf-binary-index) |  |
+| `index` |  | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-binary#neighbors-ivf-binary-index) |  |
 
 **Returns**
 

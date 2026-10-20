@@ -49,7 +49,7 @@ RAFT_KERNEL accumulate_center_counts(
 
 /** See cuvs::neighbors::ivf_binary::extend docs; the vectors are validated by the caller. */
 inline void extend(raft::resources const& handle,
-                   index* idx,
+                   index<int64_t>* idx,
                    const uint8_t* new_vectors,
                    const int64_t* new_indices,
                    int64_t n_rows)
@@ -62,7 +62,7 @@ inline void extend(raft::resources const& handle,
   auto stream  = raft::resource::get_cuda_stream(handle);
   auto& lists  = index_access::lists(*idx);
   auto n_lists = idx->n_lists();
-  auto dim     = idx->encoded_dim();
+  auto dim     = idx->storage_dim();
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_binary::extend(%zu, %u)", size_t(n_rows), dim);
 
@@ -166,7 +166,7 @@ inline void extend(raft::resources const& handle,
 /** See cuvs::neighbors::ivf_binary::build docs */
 inline auto build(raft::resources const& handle,
                   const index_params& params,
-                  device_binary_dataset_view<float, int64_t> dataset) -> index
+                  device_binary_dataset_view<float, int64_t> dataset) -> index<int64_t>
 {
   auto stream          = raft::resource::get_cuda_stream(handle);
   const int64_t n_rows = dataset.n_rows();
@@ -179,8 +179,8 @@ inline auto build(raft::resources const& handle,
   RAFT_EXPECTS(n_rows > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
 
-  index idx(handle, params, dataset.dim());
-  const auto dim = idx.encoded_dim();
+  index<int64_t> idx(handle, params, dataset.dim());
+  const auto dim = idx.storage_dim();
   auto& lists    = index_access::lists(idx);
 
   auto& quantizer     = index_access::quantizer(idx);

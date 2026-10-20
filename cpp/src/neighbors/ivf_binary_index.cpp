@@ -34,7 +34,8 @@ void zero_fill(raft::resources const& res, T* ptr, size_t n)
 
 }  // namespace
 
-index::index(raft::resources const& res)
+template <typename IdxT>
+index<IdxT>::index(raft::resources const& res)
   : dim_{0},
     adaptive_centers_{false},
     quantizer_{res},
@@ -44,7 +45,8 @@ index::index(raft::resources const& res)
 {
 }
 
-index::index(raft::resources const& res, const index_params& params, uint32_t dim)
+template <typename IdxT>
+index<IdxT>::index(raft::resources const& res, const index_params& params, uint32_t dim)
   : dim_{dim},
     adaptive_centers_{params.adaptive_centers},
     quantizer_{res},
@@ -65,40 +67,68 @@ index::index(raft::resources const& res, const index_params& params, uint32_t di
   zero_fill(res, lists_.centers().data_handle(), lists_.centers().size());
 }
 
-uint32_t index::dim() const noexcept { return dim_; }
+template <typename IdxT>
+uint32_t index<IdxT>::dim() const noexcept
+{
+  return dim_;
+}
 
-uint32_t index::encoded_dim() const noexcept { return static_cast<uint32_t>(centers_.extent(1)); }
+template <typename IdxT>
+uint32_t index<IdxT>::storage_dim() const noexcept
+{
+  return static_cast<uint32_t>(centers_.extent(1));
+}
 
-uint32_t index::n_lists() const noexcept { return lists_.n_lists(); }
+template <typename IdxT>
+uint32_t index<IdxT>::n_lists() const noexcept
+{
+  return lists_.n_lists();
+}
 
-int64_t index::size() const noexcept { return lists_.size(); }
+template <typename IdxT>
+IdxT index<IdxT>::size() const noexcept
+{
+  return lists_.size();
+}
 
-bool index::adaptive_centers() const noexcept { return adaptive_centers_; }
+template <typename IdxT>
+bool index<IdxT>::adaptive_centers() const noexcept
+{
+  return adaptive_centers_;
+}
 
-bool index::conservative_memory_allocation() const noexcept
+template <typename IdxT>
+bool index<IdxT>::conservative_memory_allocation() const noexcept
 {
   return lists_.conservative_memory_allocation();
 }
 
-raft::device_vector_view<const uint32_t, uint32_t> index::list_sizes() const noexcept
+template <typename IdxT>
+raft::device_vector_view<const uint32_t, uint32_t> index<IdxT>::list_sizes() const noexcept
 {
   return lists_.list_sizes();
 }
 
-raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> index::centers() const noexcept
+template <typename IdxT>
+raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> index<IdxT>::centers()
+  const noexcept
 {
   return centers_.view();
 }
 
-raft::device_matrix_view<const uint32_t, int64_t, raft::row_major> index::center_counts()
+template <typename IdxT>
+raft::device_matrix_view<const uint32_t, int64_t, raft::row_major> index<IdxT>::center_counts()
   const noexcept
 {
   return center_counts_.view();
 }
 
-const preprocessing::quantize::binary::quantizer<float>& index::quantizer() const noexcept
+template <typename IdxT>
+const preprocessing::quantize::binary::quantizer<float>& index<IdxT>::quantizer() const noexcept
 {
   return quantizer_;
 }
+
+template struct CUVS_EXPORT index<int64_t>;
 
 }  // namespace cuvs::neighbors::ivf_binary

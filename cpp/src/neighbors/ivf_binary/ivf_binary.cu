@@ -20,7 +20,7 @@ namespace {
 // the inverted lists in the IVF-Flat format.
 constexpr int kSerializationVersion = 1;
 
-void serialize_impl(raft::resources const& handle, std::ostream& os, const index& idx)
+void serialize_impl(raft::resources const& handle, std::ostream& os, const index<int64_t>& idx)
 {
   raft::serialize_scalar(handle, os, kSerializationVersion);
   raft::serialize_scalar(handle, os, idx.dim());
@@ -39,7 +39,7 @@ void serialize_impl(raft::resources const& handle, std::ostream& os, const index
 }
 
 template <typename Input>
-auto deserialize_impl(raft::resources const& handle, Input& input) -> index
+auto deserialize_impl(raft::resources const& handle, Input& input) -> index<int64_t>
 {
   auto& is = cuvs::util::detail::input_stream(input);
 
@@ -66,7 +66,7 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index
   params.n_lists                        = n_lists;
   params.adaptive_centers               = adaptive;
   params.conservative_memory_allocation = cma;
-  index idx(handle, params, dim);
+  index<int64_t> idx(handle, params, dim);
 
   auto& quantizer     = detail::index_access::quantizer(idx);
   quantizer.threshold = raft::make_device_vector<float, int64_t>(handle, n_threshold);
@@ -80,7 +80,7 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index
   }
 
   auto lists = ivf_flat::detail::deserialize_impl<uint8_t, int64_t>(handle, input);
-  RAFT_EXPECTS(lists.n_lists() == n_lists && lists.dim() == idx.encoded_dim() &&
+  RAFT_EXPECTS(lists.n_lists() == n_lists && lists.dim() == idx.storage_dim() &&
                  lists.metric() == cuvs::distance::DistanceType::BitwiseHamming,
                "ivf_binary::deserialize: the lists do not match the index header");
   detail::index_access::lists(idx) = std::move(lists);
@@ -91,7 +91,7 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index
 
 auto build(raft::resources const& handle,
            const index_params& index_params,
-           device_binary_dataset_view<float, int64_t> dataset) -> index
+           device_binary_dataset_view<float, int64_t> dataset) -> index<int64_t>
 {
   return detail::build(handle, index_params, dataset);
 }
@@ -99,7 +99,7 @@ auto build(raft::resources const& handle,
 void extend(raft::resources const& handle,
             device_binary_dataset_view<float, int64_t> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
-            index* index)
+            index<int64_t>* index)
 {
   RAFT_EXPECTS(index != nullptr, "index cannot be empty.");
   RAFT_EXPECTS(new_vectors.dim() == index->dim(),
@@ -117,7 +117,7 @@ void extend(raft::resources const& handle,
 
 void search(raft::resources const& handle,
             const search_params& params,
-            const index& index,
+            const index<int64_t>& index,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
@@ -126,12 +126,14 @@ void search(raft::resources const& handle,
   detail::search(handle, params, index, queries, neighbors, distances, sample_filter);
 }
 
-void serialize(raft::resources const& handle, std::ostream& os, const index& index)
+void serialize(raft::resources const& handle, std::ostream& os, const index<int64_t>& index)
 {
   serialize_impl(handle, os, index);
 }
 
-void serialize(raft::resources const& handle, const std::string& filename, const index& index)
+void serialize(raft::resources const& handle,
+               const std::string& filename,
+               const index<int64_t>& index)
 {
   cuvs::util::kvikio_ofstream of(filename);
   serialize_impl(handle, of, index);
@@ -139,12 +141,12 @@ void serialize(raft::resources const& handle, const std::string& filename, const
   if (!of) { RAFT_FAIL("Error writing output %s", filename.c_str()); }
 }
 
-void deserialize(raft::resources const& handle, std::istream& is, index* index)
+void deserialize(raft::resources const& handle, std::istream& is, index<int64_t>* index)
 {
   *index = deserialize_impl(handle, is);
 }
 
-void deserialize(raft::resources const& handle, const std::string& filename, index* index)
+void deserialize(raft::resources const& handle, const std::string& filename, index<int64_t>* index)
 {
   cuvs::util::kvikio_file_reader reader(filename);
   *index = deserialize_impl(handle, reader);

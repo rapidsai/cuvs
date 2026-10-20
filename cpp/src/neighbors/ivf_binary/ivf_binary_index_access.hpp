@@ -11,20 +11,25 @@ namespace cuvs::neighbors::ivf_binary::detail {
 
 /** Internal access to the mutable state of the index. */
 struct index_access {
-  static auto lists(index& idx) -> ivf_flat::index<uint8_t, int64_t>& { return idx.lists_; }
-  static auto lists(const index& idx) -> const ivf_flat::index<uint8_t, int64_t>&
+  static auto lists(index<int64_t>& idx) -> ivf_flat::index<uint8_t, int64_t>&
   {
     return idx.lists_;
   }
-  static auto centers(index& idx) -> raft::device_matrix<uint8_t, int64_t, raft::row_major>&
+  static auto lists(const index<int64_t>& idx) -> const ivf_flat::index<uint8_t, int64_t>&
+  {
+    return idx.lists_;
+  }
+  static auto centers(index<int64_t>& idx)
+    -> raft::device_matrix<uint8_t, int64_t, raft::row_major>&
   {
     return idx.centers_;
   }
-  static auto center_counts(index& idx) -> raft::device_matrix<uint32_t, int64_t, raft::row_major>&
+  static auto center_counts(index<int64_t>& idx)
+    -> raft::device_matrix<uint32_t, int64_t, raft::row_major>&
   {
     return idx.center_counts_;
   }
-  static auto quantizer(index& idx) -> preprocessing::quantize::binary::quantizer<float>&
+  static auto quantizer(index<int64_t>& idx) -> preprocessing::quantize::binary::quantizer<float>&
   {
     return idx.quantizer_;
   }

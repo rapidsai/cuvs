@@ -115,7 +115,7 @@ TEST(IvfBinary, ExhaustiveSearchMatchesBruteForce)
       auto params = small_params(16);
       auto idx    = build(handle, params, dataset);
       ASSERT_EQ(idx.dim(), dim);
-      ASSERT_EQ(idx.encoded_dim(), n_bytes);
+      ASSERT_EQ(idx.storage_dim(), n_bytes);
       ASSERT_EQ(idx.size(), n_rows);
 
       auto codes_host = to_host(handle, codes.data_handle(), codes.size());
@@ -208,7 +208,7 @@ TEST(IvfBinary, SerializationRoundTrip)
 
   std::stringstream bytes;
   serialize(handle, bytes, idx);
-  index restored(handle);
+  index<int64_t> restored(handle);
   deserialize(handle, bytes, &restored);
   ASSERT_EQ(restored.dim(), dim);
   ASSERT_EQ(restored.size(), n_rows);
@@ -254,7 +254,7 @@ TEST(IvfBinary, AdaptiveCentersKeepExactCounts)
 
   std::stringstream bytes;
   serialize(handle, bytes, idx);
-  index restored(handle);
+  index<int64_t> restored(handle);
   deserialize(handle, bytes, &restored);
 
   auto more = to_device(handle, std::vector<uint8_t>{0, 0, 0}, 3, 1);
