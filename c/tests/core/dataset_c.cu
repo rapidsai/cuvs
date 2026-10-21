@@ -59,6 +59,8 @@ template <typename T>
 auto device_padded_view(cuvsDataset_t dataset)
 {
   return reinterpret_cast<cuvs::neighbors::device_padded_dataset_view<T, int64_t>*>(dataset->addr);
+}
+
 template <typename T>
 auto make_device_matrix_tensor(T* data, int64_t rows, int64_t columns) -> DLManagedTensor
 {
