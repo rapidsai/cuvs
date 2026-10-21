@@ -48,6 +48,8 @@ public class TestCagraIndexParamsFactory extends LuceneTestCase {
     assertEquals(CagraGraphBuildAlgo.NN_DESCENT, cagraParams.getCagraGraphBuildAlgo());
     // The graph degree is an input to the heuristic, so it survives...
     assertEquals(48, cagraParams.getGraphDegree());
+    // This heuristic keeps constant-degree graphs.
+    assertEquals(1.0, cagraParams.getVariableGraphDegreeFraction(), 0.0);
     // ...but the intermediate degree is derived as graph_degree * 3 / 2, overriding the configured
     // 96. cuVS derives the build parameters from that value, so the two must stay in step.
     assertEquals(48 * 3 / 2, cagraParams.getIntermediateGraphDegree());
@@ -191,6 +193,9 @@ public class TestCagraIndexParamsFactory extends LuceneTestCase {
     // SAME_GRAPH_FOOTPRINT yields graph_degree = 2 * maxConn; cuVS owns the exact derivation, so we
     // assert the footprint relationship it documents rather than a hardcoded value.
     assertEquals(2L * params.getMaxConn(), cagraParams.getGraphDegree());
+    // The variable-degree fraction chosen by the heuristic must survive the native round trip and
+    // the rebuild of the params (SAME_GRAPH_FOOTPRINT enables variable-degree graphs).
+    assertTrue(cagraParams.getVariableGraphDegreeFraction() < 1.0);
     // The caller-configured writerThreads must be honored on the HEURISTIC path.
     assertEquals(7, cagraParams.getNumWriterThreads());
   }

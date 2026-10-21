@@ -226,6 +226,20 @@ struct cuvsCagraIndexParams {
    * - Others: nullptr
    */
   void* graph_build_params;
+  /**
+   * Fraction of `graph_degree` to define the minimum output graph degree, allowing
+   * variable-degree neighbor graphs.
+   *
+   * Must be in [0, 1]. The default value of 1.0 disables the variable-degree logic (normal CAGRA
+   * behavior). Values < 1.0 enable variable-degree graphs: the optimize step finds the minimum
+   * detour threshold that covers at least ceil(graph_degree * fraction) edges per node, then lets
+   * reverse edges expand the degree further. Unused slots are filled with an invalid-neighbor
+   * sentinel (all bits set, i.e. `UINT32_MAX` for the 32-bit graph indices).
+   *
+   * This is intended for the CAGRA-to-HNSW conversion pipeline (see
+   * `cuvsCagraIndexParamsFromHnswParams`). Do not use this with CAGRA's native GPU search.
+   */
+  double variable_graph_degree_fraction;
 };
 
 typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
