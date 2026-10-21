@@ -180,6 +180,11 @@ TEST(DatasetC, MakePaddedFromDeviceAlignedOwnsCopy)
   EXPECT_NE(owner->data_handle(), device.data())
     << "expected an independent copy, not an alias of the source buffer";
 
+  std::vector<float> copied(host.size());
+  raft::copy(copied.data(), owner->data_handle(), copied.size(), stream);
+  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
+  EXPECT_EQ(copied, host) << "the owning copy must contain the source values";
+
   ASSERT_EQ(cuvsDatasetDestroy(padded), CUVS_SUCCESS);
   ASSERT_EQ(cuvsResourcesDestroy(res), CUVS_SUCCESS);
 }
