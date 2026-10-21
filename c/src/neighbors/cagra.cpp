@@ -1921,8 +1921,11 @@ static cuvsError_t dispatch_update_dataset(cuvsResources_t res,
     RAFT_EXPECTS(dataset->layout == CUVS_DATASET_LAYOUT_PADDED ||
                    dataset->layout == CUVS_DATASET_LAYOUT_PQ,
                  "cuvsCagraUpdateDataset: dataset layout must be PADDED or PQ");
-    RAFT_EXPECTS(index->dtype.code == dataset->dtype.code &&
-                   index->dtype.bits == dataset->dtype.bits,
+    // A PQ dataset's dtype is its codebook math type, not the source element type, which lives on
+    // the index.
+    RAFT_EXPECTS(dataset->layout == CUVS_DATASET_LAYOUT_PQ ||
+                   (index->dtype.code == dataset->dtype.code &&
+                    index->dtype.bits == dataset->dtype.bits),
                  "cuvsCagraUpdateDataset: dtype mismatch between index and dataset");
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       update_dataset<float>(res_ptr, dataset, index);
@@ -1952,8 +1955,11 @@ extern "C" cuvsError_t cuvsCagraUpdateDataset(cuvsResources_t res,
                    (dataset->layout == CUVS_DATASET_LAYOUT_PADDED ||
                     dataset->layout == CUVS_DATASET_LAYOUT_PQ),
                  "cuvsCagraUpdateDataset: dataset must be device padded or device PQ");
-    RAFT_EXPECTS(index->dtype.code == dataset->dtype.code &&
-                   index->dtype.bits == dataset->dtype.bits,
+    // A PQ dataset's dtype is its codebook math type, not the source element type, which lives on
+    // the index.
+    RAFT_EXPECTS(dataset->layout == CUVS_DATASET_LAYOUT_PQ ||
+                   (index->dtype.code == dataset->dtype.code &&
+                    index->dtype.bits == dataset->dtype.bits),
                  "cuvsCagraUpdateDataset: dtype mismatch between index and dataset");
   });
   if (status != CUVS_SUCCESS) { return status; }
