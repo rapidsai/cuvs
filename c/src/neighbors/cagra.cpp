@@ -32,6 +32,7 @@
 #include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/preprocessing/quantize/bbq.h>
+#include <cuvs/preprocessing/quantize/pq.h>
 #include <cuvs/preprocessing/quantize/pq.hpp>
 #include "../core/exceptions.hpp"
 #include "../core/interop.hpp"
@@ -514,29 +515,33 @@ static void bind_vpq_owner_to_dataset(std::unique_ptr<device_vpq_owner_t> owner,
   *output           = out;
 }
 
-static auto make_cpp_vpq_params(cuvsPqParams const& params)
-  -> cuvs::neighbors::vpq_params
+static auto make_cpp_pq_params(cuvsProductQuantizerParams const& params)
+  -> cuvs::preprocessing::quantize::pq::params
 {
-  auto out                            = cuvs::neighbors::vpq_params{};
-  out.pq_bits                         = params.pq_bits;
-  out.pq_dim                          = params.pq_dim;
-  out.vq_n_centers                    = params.vq_n_centers;
-  out.kmeans_n_iters                  = params.kmeans_n_iters;
-  out.vq_kmeans_trainset_fraction     = params.vq_kmeans_trainset_fraction;
-  out.pq_kmeans_trainset_fraction     = params.pq_kmeans_trainset_fraction;
-  return out;
+  RAFT_EXPECTS(params.use_subspaces,
+               "CAGRA-Q requires subspace product quantization (use_subspaces must be true)");
+  return cuvs::preprocessing::quantize::pq::params(
+    params.pq_bits,
+    params.pq_dim,
+    params.use_subspaces,
+    params.use_vq,
+    params.vq_n_centers,
+    params.kmeans_n_iters,
+    static_cast<cuvs::cluster::kmeans::kmeans_type>(params.pq_kmeans_type),
+    params.max_train_points_per_pq_code,
+    params.max_train_points_per_vq_cluster);
 }
 
 template <typename T>
 static auto make_device_pq_dataset(raft::resources* res_ptr,
-                                   cuvsPqParams const& params,
+                                   cuvsProductQuantizerParams const& params,
                                    cuvsDataset_t dataset)
   -> std::unique_ptr<device_vpq_owner_t>
 {
   RAFT_EXPECTS(dataset->layout == CUVS_DATASET_LAYOUT_STANDARD ||
                  dataset->layout == CUVS_DATASET_LAYOUT_PADDED,
                "cuvsDatasetMakePQ: source dataset must have STANDARD or PADDED layout");
-  auto cpp_params = make_cpp_vpq_params(params);
+  auto cpp_params = make_cpp_pq_params(params);
   std::unique_ptr<device_vpq_owner_t> owner;
   auto make = [&](auto const& view) {
     owner = std::make_unique<device_vpq_owner_t>(
@@ -733,22 +738,10 @@ static void make_device_pq_dataset(raft::resources* res_ptr,
                  source_dataset->layout == CUVS_DATASET_LAYOUT_PADDED,
                "cuvsDatasetMakePq: source must be a device-padded dataset");
 
-  cuvs::neighbors::vpq_params ps{};
-  if (params != nullptr) {
-    RAFT_EXPECTS(params->use_subspaces,
-                 "cuvsDatasetMakePq: CAGRA-Q requires subspace product quantization");
-    ps.pq_bits                     = params->pq_bits;
-    ps.pq_dim                      = params->pq_dim;
-    ps.vq_n_centers                = params->use_vq ? params->vq_n_centers : 1;
-    ps.kmeans_n_iters              = params->kmeans_n_iters;
-    // ProductQuantizerParams uses absolute training-point caps rather than the legacy fractions.
-    ps.vq_kmeans_trainset_fraction = 1.0;
-    ps.pq_kmeans_trainset_fraction = 1.0;
-    ps.pq_kmeans_type =
-      static_cast<cuvs::cluster::kmeans::kmeans_type>(params->pq_kmeans_type);
-    ps.max_train_points_per_pq_code    = params->max_train_points_per_pq_code;
-    ps.max_train_points_per_vq_cluster = params->max_train_points_per_vq_cluster;
-  }
+  // NULL params select VQ with a heuristic number of centers.
+  cuvs::preprocessing::quantize::pq::params ps;
+  ps.use_vq = true;
+  if (params != nullptr) { ps = make_cpp_pq_params(*params); }
 
   using owner_t = cuvs::neighbors::device_padded_dataset<T, int64_t>;
   using view_t  = cuvs::neighbors::device_padded_dataset_view<T, int64_t>;
@@ -1885,7 +1878,7 @@ extern "C" cuvsError_t cuvsDatasetMakeBbqView(cuvsResources_t,
 }
 
 extern "C" cuvsError_t cuvsDatasetMakePQ(cuvsResources_t res,
-                                         cuvsPqParams_t params,
+                                         cuvsProductQuantizerParams_t params,
                                          cuvsDataset_t dataset,
                                          cuvsDatasetMemType_t target_mem_type,
                                          cuvsDataset_t* pq_dataset)
@@ -2375,35 +2368,6 @@ extern "C" cuvsError_t cuvsCagraMergeParamsCreate(cuvsCagraMergeParams_t* params
 extern "C" cuvsError_t cuvsCagraMergeParamsDestroy(cuvsCagraMergeParams_t params)
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
-}
-
-extern "C" cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* params)
-{
-  return cuvs::core::translate_exceptions([=] {
-    auto ps = cuvs::neighbors::vpq_params();
-    *params =
-      new cuvsCagraCompressionParams{.pq_bits                     = ps.pq_bits,
-                                     .pq_dim                      = ps.pq_dim,
-                                     .vq_n_centers                = ps.vq_n_centers,
-                                     .kmeans_n_iters              = ps.kmeans_n_iters,
-                                     .vq_kmeans_trainset_fraction = ps.vq_kmeans_trainset_fraction,
-                                     .pq_kmeans_trainset_fraction = ps.pq_kmeans_trainset_fraction};
-  });
-}
-
-extern "C" cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params)
-{
-  return cuvs::core::translate_exceptions([=] { delete params; });
-}
-
-extern "C" cuvsError_t cuvsPqParamsCreate(cuvsPqParams_t* params)
-{
-  return cuvsCagraCompressionParamsCreate(params);
-}
-
-extern "C" cuvsError_t cuvsPqParamsDestroy(cuvsPqParams_t params)
-{
-  return cuvsCagraCompressionParamsDestroy(params);
 }
 
 extern "C" cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params)

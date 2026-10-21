@@ -82,7 +82,7 @@ CUVS_EXPORT cuvsError_t cuvsDatasetMakePadded(cuvsResources_t res,
  * Only device output is currently supported.
  */
 CUVS_EXPORT cuvsError_t cuvsDatasetMakePQ(cuvsResources_t res,
-                                          cuvsPqParams_t params,
+                                          cuvsProductQuantizerParams_t params,
                                           cuvsDataset_t dataset,
                                           cuvsDatasetMemType_t target_mem_type,
                                           cuvsDataset_t* pq_dataset);

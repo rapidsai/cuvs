@@ -262,7 +262,7 @@ Train PQ storage (codebooks + encoded rows) from a row-major mdspan/mdarray/data
 ```cpp
 template <typename SrcT>
 [[nodiscard]] auto make_device_pq_dataset(raft::resources const& res,
-cuvs::neighbors::vpq_params const& params,
+cuvs::preprocessing::quantize::pq::params const& params,
 SrcT const& src)
 -> cuvs::neighbors::device_vpq_dataset<half, int64_t>;
 ```
@@ -276,7 +276,7 @@ Typical **CAGRA** usage: build the graph on dense vectors, then attach PQ for se
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
-| `params` |  | [`cuvs::neighbors::vpq_params const&`](/api-reference/cpp-api-neighbors-cagra#neighbors-vpq-params) |  |
+| `params` |  | [`cuvs::preprocessing::quantize::pq::params const&`](/api-reference/cpp-api-preprocessing-quantize-pq#preprocessing-quantize-pq-params) |  |
 | `src` |  | `SrcT const&` |  |
 
 **Returns**

@@ -165,9 +165,9 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
     using dataset_dependent_params = std::function<cuvs::neighbors::cagra::index_params(
       raft::matrix_extent<int64_t>, cuvs::distance::DistanceType)>;
     dataset_dependent_params cagra_params;
-    std::optional<cuvs::neighbors::vpq_params> compression = std::nullopt;
-    size_t num_dataset_splits                              = 1;
-    CagraMergeType merge_type                              = CagraMergeType::kPhysical;
+    std::optional<cuvs::preprocessing::quantize::pq::params> compression = std::nullopt;
+    size_t num_dataset_splits                                            = 1;
+    CagraMergeType merge_type = CagraMergeType::kPhysical;
     cuvs::neighbors::cagra::merge_params merge_params;
   };
 

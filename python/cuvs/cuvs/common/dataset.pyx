@@ -159,7 +159,7 @@ def make_device_pq_dataset(params, dataset, resources=None):
     cdef Dataset pq = Dataset()
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
     cdef cydlpack.DLManagedTensor* dataset_dlpack = NULL
-    cdef cuvsPqParams_t c_params = NULL
+    cdef cuvsProductQuantizerParams_t c_params = NULL
 
     if isinstance(dataset, Dataset):
         dense = dataset
@@ -171,16 +171,17 @@ def make_device_pq_dataset(params, dataset, resources=None):
         check_cuvs(cuvsDatasetMakeStandardView(
             res, dataset_dlpack, &dense.dataset))
 
-    check_cuvs(cuvsPqParamsCreate(&c_params))
+    check_cuvs(cuvsProductQuantizerParamsCreate(&c_params))
     try:
         c_params.pq_bits = params.pq_bits
         c_params.pq_dim = params.pq_dim
+        c_params.use_subspaces = True
+        # vq_n_centers == 1 means PQ only; 0 selects the VQ size heuristic.
+        c_params.use_vq = params.vq_n_centers != 1
         c_params.vq_n_centers = params.vq_n_centers
         c_params.kmeans_n_iters = params.kmeans_n_iters
-        c_params.vq_kmeans_trainset_fraction = \
-            params.vq_kmeans_trainset_fraction
-        c_params.pq_kmeans_trainset_fraction = \
-            params.pq_kmeans_trainset_fraction
+        # The trainset fractions have no ProductQuantizerParams equivalent
+        # (training is bounded by max_train_points_* instead) and are ignored.
 
         check_cuvs(cuvsDatasetMakePQ(
             res,
@@ -189,5 +190,5 @@ def make_device_pq_dataset(params, dataset, resources=None):
             CUVS_DATASET_MEM_TYPE_DEVICE,
             &pq.dataset))
     finally:
-        check_cuvs(cuvsPqParamsDestroy(c_params))
+        check_cuvs(cuvsProductQuantizerParamsDestroy(c_params))
     return pq

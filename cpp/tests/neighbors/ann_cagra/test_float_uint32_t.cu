@@ -175,7 +175,10 @@ TEST(AnnCagraPq, BuildUpdatePqSearch)
   index_params.metric = cuvs::distance::DistanceType::L2Expanded;
   auto dense_index    = cagra::build(handle, index_params, padded.view);
 
-  cuvs::neighbors::vpq_params pq_params{.pq_bits = 8, .pq_dim = 8};
+  cuvs::preprocessing::quantize::pq::params pq_params;
+  pq_params.pq_bits = 8;
+  pq_params.pq_dim  = 8;
+  pq_params.use_vq  = true;
   auto pq =
     cuvs::preprocessing::quantize::pq::make_device_pq_dataset(handle, pq_params, padded.view);
   raft::resource::sync_stream(handle);

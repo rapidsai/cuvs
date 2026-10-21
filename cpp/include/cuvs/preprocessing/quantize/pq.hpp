@@ -257,7 +257,7 @@ namespace detail {
 // instantiation is capped by that of its template arguments.
 [[nodiscard]] CUVS_EXPORT cuvs::neighbors::device_vpq_dataset<half, int64_t> vpq_train_from_rows(
   raft::resources const& res,
-  cuvs::neighbors::vpq_params const& params,
+  cuvs::preprocessing::quantize::pq::params const& params,
   void const* src_ptr,
   cudaDataType_t dtype,
   int64_t n_rows,
@@ -300,7 +300,7 @@ namespace detail {
  */
 template <typename SrcT>
 [[nodiscard]] auto make_device_pq_dataset(raft::resources const& res,
-                                          cuvs::neighbors::vpq_params const& params,
+                                          cuvs::preprocessing::quantize::pq::params const& params,
                                           SrcT const& src)
   -> cuvs::neighbors::device_vpq_dataset<half, int64_t>
 {
