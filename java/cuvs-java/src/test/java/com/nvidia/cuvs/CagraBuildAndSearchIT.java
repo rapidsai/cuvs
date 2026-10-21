@@ -978,7 +978,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
         log.trace("Merging indexes...");
         CagraIndex mergedIndex =
-            CagraIndex.merge(new CagraIndex[] {index1, index2}, mergedDataset, mergeOffsets);
+            CagraIndex.merge(
+                new CagraIndex[] {index1, index2}, mergedDataset, mergeOffsets, mergeParams);
         log.trace("Merge completed successfully");
 
         // Pin SINGLE_CTA; AUTO may pick MULTI_CTA, which drops neighbors on this tiny dataset.
@@ -1065,6 +1066,12 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .withMetric(CuvsDistanceType.L2Expanded)
               .build();
 
+      // The merged fixture is too small to train even a 16-centroid IVF-PQ codebook.
+      CagraIndexParams mergeParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .build();
+
       CagraIndex index1 =
           CagraIndex.newBuilder(resources)
               .withDataset(vector1)
@@ -1087,7 +1094,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         long[] mergeOffsets = {0L, vector1.length, vector1.length + (long) vector2.length};
 
         try (var mergedDataset = CagraIndex.concatenateDatasets(indexes)) {
-          try (CagraIndex mergedIndex = CagraIndex.merge(indexes, mergedDataset, mergeOffsets)) {
+          try (CagraIndex mergedIndex =
+              CagraIndex.merge(indexes, mergedDataset, mergeOffsets, mergeParams)) {
             assertEquals(
                 "concatenateDatasets should hold every input row",
                 vector1.length + (long) vector2.length,
@@ -1165,6 +1173,12 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .withMetric(CuvsDistanceType.L2Expanded)
               .build();
 
+      // The merged fixture is too small to train even a 16-centroid IVF-PQ codebook.
+      CagraIndexParams mergeParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .build();
+
       CagraIndex index1 =
           CagraIndex.newBuilder(resources)
               .withDataset(vector1)
@@ -1195,8 +1209,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
         try (var filteredDataset = CagraIndex.concatenateAndFilterDatasets(indexes, rowFilter)) {
           try (CagraIndex mergedIndex =
-              CagraIndex.merge(
-                  indexes, filteredDataset, filteredOffsets, rowFilter, /* mergeParams= */ null)) {
+              CagraIndex.merge(indexes, filteredDataset, filteredOffsets, rowFilter, mergeParams)) {
             assertEquals(
                 "The merged index should hold one row per set bit",
                 rowFilter.cardinality(),
@@ -1354,7 +1367,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         assertEquals("Input index sizes", 3, index2.size());
 
         try (CagraIndex mergedIndex =
-            CagraIndex.merge(new CagraIndex[] {index1, index2}, mergedDataset, mergeOffsets)) {
+            CagraIndex.merge(
+                new CagraIndex[] {index1, index2}, mergedDataset, mergeOffsets, mergeParams)) {
           assertEquals(
               "The merged index should hold one row per set bit",
               rowFilter.cardinality(),
@@ -1541,7 +1555,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             index2.updateDataset(padded2);
 
             try (CagraIndex mergedIndex =
-                CagraIndex.merge(new CagraIndex[] {index1, index2}, mergedDataset, mergeOffsets)) {
+                CagraIndex.merge(
+                    new CagraIndex[] {index1, index2}, mergedDataset, mergeOffsets, mergeParams)) {
               assertEquals(
                   "The merged index holds every row of both inputs", 6, mergedIndex.size());
 

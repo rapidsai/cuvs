@@ -143,6 +143,8 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
                                        DLManagedTensor * graph)
     cuvsError_t cuvsCagraIndexGetDatasetAsDLTensor(cuvsCagraIndex_t index,
                                          DLManagedTensor * dataset)
+    cuvsError_t cuvsCagraIndexGetDatasetHandle(cuvsCagraIndex_t index,
+                                               cuvsDataset_t* dataset)
 
     cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                                cuvsCagraIndexParams_t params,
@@ -222,8 +224,8 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
     cuvsError_t cuvsCagraMergeParamsDestroy(cuvsCagraMergeParams_t params)
 
     cuvsError_t cuvsMergedDatasetOffsets(cuvsResources_t res,
-                                              cuvsCagraIndex_t* indices,
-                                              size_t num_indices,
+                                              cuvsDataset_t* datasets,
+                                              size_t num_datasets,
                                               cuvsFilter filter,
                                               int64_t* offsets)
 

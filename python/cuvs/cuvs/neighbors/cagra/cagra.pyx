@@ -1312,22 +1312,34 @@ def merged_dataset_offsets(indices, filter=None, resources=None):
         filter = no_filter()
 
     cdef size_t num_indices = len(indices)
-    cdef cuvsCagraIndex_t* c_indices = _index_array(indices)
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
-    offsets = np.empty(num_indices + 1, dtype=np.int64)
-    cdef int64_t[::1] offsets_view = offsets
+    cdef cuvsDataset_t* c_datasets = <cuvsDataset_t*>malloc(
+        num_indices * sizeof(cuvsDataset_t))
+    if c_datasets == NULL:
+        raise MemoryError("Could not allocate dataset array")
 
+    cdef Index idx
+    cdef size_t i
     try:
+        for i in range(num_indices):
+            idx = indices[i]
+            if not idx.trained:
+                raise ValueError("All input indices must be trained/built")
+            check_cuvs(cuvsCagraIndexGetDatasetHandle(idx.index, &c_datasets[i]))
+
+        offsets = np.empty(num_indices + 1, dtype=np.int64)
+        cdef int64_t[::1] offsets_view = offsets
+
         with cuda_interruptible():
             check_cuvs(cuvsMergedDatasetOffsets(
                 res,
-                c_indices,
+                c_datasets,
                 num_indices,
                 filter.prefilter,
                 &offsets_view[0]))
     finally:
-        free(c_indices)
+        free(c_datasets)
 
     return offsets
 

@@ -1001,8 +1001,8 @@ mod tests {
         let res = Resources::new().unwrap();
         let build_params = IndexParams::builder().build().unwrap();
 
-        let n1 = 128usize;
-        let n2 = 96usize;
+        let n1 = N_DATAPOINTS;
+        let n2 = N_DATAPOINTS;
         let dataset_a =
             ndarray::Array::<f32, _>::random((n1, N_FEATURES), Uniform::new(0., 1.0).unwrap());
         let dataset_b =
@@ -1038,8 +1038,8 @@ mod tests {
         let build_params = IndexParams::builder().build().unwrap();
         let merge_params = MergeParams::builder().build().unwrap();
 
-        let n1 = 64usize;
-        let n2 = 64usize;
+        let n1 = N_DATAPOINTS;
+        let n2 = N_DATAPOINTS;
         let dataset_a =
             ndarray::Array::<f32, _>::random((n1, N_FEATURES), Uniform::new(0., 1.0).unwrap());
         let dataset_b =
@@ -1096,8 +1096,8 @@ mod tests {
         let res = Resources::new().unwrap();
         let build_params = IndexParams::builder().build().unwrap();
 
-        let n1 = 96usize;
-        let n2 = 32usize;
+        let n1 = N_DATAPOINTS;
+        let n2 = N_DATAPOINTS;
         let dataset_a =
             ndarray::Array::<f32, _>::random((n1, N_FEATURES), Uniform::new(0., 1.0).unwrap());
         let dataset_b =
@@ -1117,7 +1117,7 @@ mod tests {
         let res = Resources::new().unwrap();
         let build_params = IndexParams::builder().build().unwrap();
 
-        let n_datapoints = 64;
+        let n_datapoints = N_DATAPOINTS;
         let dataset = ndarray::Array::<f32, _>::random(
             (n_datapoints, N_FEATURES),
             Uniform::new(0., 1.0).unwrap(),

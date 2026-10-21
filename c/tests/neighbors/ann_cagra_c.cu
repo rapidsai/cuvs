@@ -1232,6 +1232,7 @@ TEST(CagraC, ConcatenateDatasetsMergeSearch)
 
   cuvsCagraIndexParams_t build_params;
   cuvsCagraIndexParamsCreate(&build_params);
+  set_small_dataset_build_params(build_params);
   cuvsCagraIndex_t index_main, index_add;
   cuvsCagraIndexCreate(&index_main);
   cuvsCagraIndexCreate(&index_add);

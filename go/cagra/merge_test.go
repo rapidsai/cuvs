@@ -190,9 +190,9 @@ func TestCagraMerge(t *testing.T) {
 
 func TestMergedDatasetOffsetsUnfiltered(t *testing.T) {
 	const (
-		nDataPoints1 = 32
-		nDataPoints2 = 48
-		nFeatures    = 8
+		nDataPoints1 = 256
+		nDataPoints2 = 256
+		nFeatures    = 16
 	)
 	r := rand.New(rand.NewPCG(11, 0))
 
