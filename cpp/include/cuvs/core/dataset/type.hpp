@@ -15,8 +15,10 @@
 namespace CUVS_EXPORT cuvs {
 
 /**
- * An owning dataset: the data and, for a compressed dataset, the manifest that gives it meaning.
+ * An owning dataset: the data and, for a compound dataset, the manifest that gives it meaning.
  * Ownership is unique, so the type is move-only whenever the underlying storage is.
+ *
+ * See the dataset_view documentation for more details on the dataset's components.
  */
 template <typename T, typename IdxT, typename SpecT>
 struct dataset {
@@ -38,22 +40,22 @@ struct dataset {
 
   /**
     Optional slot that contains everything to give meaning to the encoded data;
-    `std::monostate` for an uncompressed dataset.
+    `std::monostate` for a plain dataset.
    */
   using manifest_type            = typename view_type::manifest_type;
   using manifest_view_type       = typename view_type::manifest_view_type;
   using const_manifest_view_type = typename view_type::const_manifest_view_type;
 
-  static constexpr bool is_compressed = view_type::is_compressed;
+  static constexpr bool is_compound = view_type::is_compound;
 
   explicit dataset(data_type&& data)
-    requires(!is_compressed)
+    requires(!is_compound)
     : data_{std::move(data)}
   {
   }
 
   dataset(data_type&& data, manifest_type&& manifest)
-    requires(is_compressed)
+    requires(is_compound)
     : data_{std::move(data)}, manifest_{std::move(manifest)}
   {
   }
@@ -65,7 +67,7 @@ struct dataset {
    */
   [[nodiscard]] auto view() noexcept -> view_type
   {
-    if constexpr (is_compressed) {
+    if constexpr (is_compound) {
       return view_type{data_view(), manifest_view()};
     } else {
       return view_type{data_view()};
@@ -78,7 +80,7 @@ struct dataset {
    */
   [[nodiscard]] auto view() const noexcept -> const_view_type
   {
-    if constexpr (is_compressed) {
+    if constexpr (is_compound) {
       return const_view_type{data_const_view(), const_manifest_view()};
     } else {
       return const_view_type{data_const_view()};
@@ -98,7 +100,7 @@ struct dataset {
    */
   [[nodiscard]] auto dim() const noexcept -> uint32_t
   {
-    // NOTE: a compressed dataset may not be able to tell its dimension from the encoded data alone
+    // NOTE: a compound dataset may not be able to tell its dimension from the encoded data alone
     return spec_type::get_dim(data_, manifest_);
   }
 
@@ -127,7 +129,7 @@ struct dataset {
    * @return A mutable view of the manifest.
    */
   [[nodiscard]] auto manifest_view() noexcept -> manifest_view_type
-    requires(is_compressed)
+    requires(is_compound)
   {
     return spec_type::get_manifest_view(manifest_);
   }
@@ -137,7 +139,7 @@ struct dataset {
    * @return A read-only view of the manifest.
    */
   [[nodiscard]] auto const_manifest_view() const noexcept -> const_manifest_view_type
-    requires(is_compressed)
+    requires(is_compound)
   {
     return spec_type::get_manifest_const_view(manifest_);
   }

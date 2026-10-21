@@ -15,10 +15,10 @@
 namespace CUVS_EXPORT cuvs {
 
 /**
- * A spec is compressing if it defines a manifest: the codebooks, the quantization range, or
- * whatever else is needed to interpret the data. Plain specs define none and the dataset
- * substitutes `std::monostate`, so "there is no manifest" and "the manifest slot is empty" are
- * the same vocabulary type.
+ * A spec is compound if it defines a manifest: the codebooks, the quantization range, or
+ * whatever else is needed to interpret the data, so the dataset consists of the data and the
+ * manifest. Plain specs define none and the dataset substitutes `std::monostate`, so "there is no
+ * manifest" and "the manifest slot is empty" are the same vocabulary type.
  *
  * NOTE: a spec declares its vocabulary types - the manifest above, and any storage representation
  * of its own - at spec scope and only re-exports them from `apply`. A type defined inside `apply`
@@ -27,11 +27,24 @@ namespace CUVS_EXPORT cuvs {
  * manifest and could no longer be built from one another.
  */
 template <typename SpecT>
-concept compressed_dataset_spec = requires { typename SpecT::manifest_type; };
+concept compound_dataset_spec = requires { typename SpecT::manifest_type; };
 
 /**
- * A non-owning view of a dataset: a view of the data and, for a compressed dataset, a view of the
+ * A non-owning view of a dataset: a view of the data and, for a compound dataset, a view of the
  * manifest that gives it meaning. Cheap to copy and to pass by value, like an mdspan.
+ *
+ * The dataset consists of two components: the data and the manifest.
+ *
+ * The data member is the main storage of the dataset: it contains the raw (maybe
+ * encoded/compressed) data. The data grows linearly with the number of rows in the dataset.
+ * Examples of the data content: floating point vectors, encoded byte representations, per-point
+ * labels scaling factors, cluster ids, etc - everything that is associated with every data row.
+ *
+ * The manifest member is an optional component that contains everything to give meaning to the
+ * data. Its size is bounded and doesn't depend directly on the number of rows in the dataset.
+ * Examples of the manifest content: codebooks, quantization ranges, global scaling factors,
+ * extra data transforms (such as rotation matrices) etc. - everything that is relevant for the
+ * entire dataset, not just individual rows.
  */
 template <typename T, typename IdxT, typename SpecT>
 struct dataset_view {
@@ -42,9 +55,9 @@ struct dataset_view {
   using value_type = typename spec_type::value_type;
   using index_type = typename spec_type::index_type;
   // What one element of the data slot is
-  //   - for compressed datasets it is the raw data element type; often is uint8_t but may be
+  //   - for compound datasets it is the raw data element type; often is uint8_t but may be
   //     a larger type to enforce better alignment.
-  //   - for uncompressed datasets it is the value type of the dataset.
+  //   - for plain datasets it is the value type of the dataset.
   using code_type = typename decltype([] {
     if constexpr (requires { typename spec_type::code_type; }) {
       return std::type_identity<typename spec_type::code_type>{};
@@ -59,7 +72,7 @@ struct dataset_view {
     std::conditional_t<is_const_view, const_data_view_type, typename spec_type::data_view_type>;
 
   // Optional slot that contains everything to give meaning to the encoded data;
-  // `std::monostate` for an uncompressed dataset.
+  // `std::monostate` for a plain dataset.
   using manifest_type = typename decltype([] {
     if constexpr (requires { typename spec_type::manifest_type; }) {
       return std::type_identity<typename spec_type::manifest_type>{};
@@ -89,19 +102,19 @@ struct dataset_view {
     }
   }())::type;
 
-  static constexpr bool is_compressed = compressed_dataset_spec<spec_type>;
+  static constexpr bool is_compound = compound_dataset_spec<spec_type>;
 
   /** An empty view, like a default-constructed mdspan: no rows, no data. */
   dataset_view() noexcept = default;
 
   explicit dataset_view(data_view_type data_view)
-    requires(!is_compressed)
+    requires(!is_compound)
     : data_view_{data_view}
   {
   }
 
   dataset_view(data_view_type data_view, manifest_view_type manifest_view)
-    requires(is_compressed)
+    requires(is_compound)
     : data_view_{data_view}, manifest_view_{manifest_view}
   {
   }
@@ -114,14 +127,14 @@ struct dataset_view {
    * constrained-away one - suppresses the implicitly declared copy constructor.
    *
    * NOTE: the manifest is assigned in the body rather than in the init-list, because the
-   * accessor it comes from is constrained on `is_compressed`.
+   * accessor it comes from is constrained on `is_compound`.
    */
   template <typename OtherT>
     requires(is_const_view && std::same_as<OtherT, std::remove_const_t<T>>)
   dataset_view(const dataset_view<OtherT, IdxT, SpecT>& other) noexcept
     : data_view_{other.data_const_view()}
   {
-    if constexpr (is_compressed) { manifest_view_ = other.const_manifest_view(); }
+    if constexpr (is_compound) { manifest_view_ = other.const_manifest_view(); }
   }
 
   /**
@@ -136,7 +149,7 @@ struct dataset_view {
   /**
    * @brief The dimension of the vectors in the dataset.
    *
-   * NOTE: a compressed dataset may not be able to tell its dimension from the encoded data alone.
+   * NOTE: a compound dataset may not be able to tell its dimension from the encoded data alone.
    *
    * @return The dimension.
    */
@@ -174,7 +187,7 @@ struct dataset_view {
    * @return A view of the manifest.
    */
   [[nodiscard]] auto manifest_view() const noexcept -> manifest_view_type
-    requires(is_compressed)
+    requires(is_compound)
   {
     return manifest_view_;
   }
@@ -184,7 +197,7 @@ struct dataset_view {
    * @return A read-only view of the manifest.
    */
   [[nodiscard]] auto const_manifest_view() const noexcept -> const_manifest_view_type
-    requires(is_compressed)
+    requires(is_compound)
   {
     if constexpr (is_const_view) {
       return manifest_view_;

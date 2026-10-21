@@ -21,7 +21,7 @@
 namespace CUVS_EXPORT cuvs {
 
 /**
- * VQ+PQ compressed dataset specification, mirroring the VPQ dataset of cuvs/neighbors/common.hpp:
+ * VQ+PQ compound dataset specification, mirroring the VPQ dataset of cuvs/neighbors/common.hpp:
  * the two codebooks form the manifest, while the data slot keeps the encoded rows - the VQ label
  * in the row prefix, followed by the packed PQ codes.
  *
