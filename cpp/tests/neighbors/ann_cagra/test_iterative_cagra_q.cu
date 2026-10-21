@@ -179,7 +179,7 @@ class CagraQBuildTest : public CagraQCompressedTestBase,
 TEST_P(CagraQBuildTest, BuildsAndSearchesAFreshlyCompressedDataset)
 {
   auto compressed = compress(res_, dataset(), params_.pq_dim);
-  ASSERT_EQ(compressed.const_dictionary_view().pq_len(),
+  ASSERT_EQ(compressed.const_manifest_view().pq_len(),
             static_cast<uint32_t>(params_.dim / params_.pq_dim));
 
   auto idx = cagra::build(res_, iterative_params(), std::as_const(compressed).view());
@@ -273,7 +273,7 @@ TEST_F(CagraQContractTest, RejectsMetricOtherThanL2Expanded)
 TEST_F(CagraQContractTest, RejectsPqBitsOtherThan8)
 {
   auto compressed = compress(res_, dataset(), 32, /* pq_bits */ 6);
-  ASSERT_EQ(compressed.const_dictionary_view().pq_bits(), 6u);
+  ASSERT_EQ(compressed.const_manifest_view().pq_bits(), 6u);
   EXPECT_THROW(cagra::build(res_, iterative_params(), std::as_const(compressed).view()),
                raft::exception);
 }
@@ -281,7 +281,7 @@ TEST_F(CagraQContractTest, RejectsPqBitsOtherThan8)
 TEST_F(CagraQContractTest, RejectsPqLenOutsideSupportedSet)
 {
   auto compressed = compress(res_, dataset(), /* pq_dim */ 4);  // pq_len = 64 / 4 = 16
-  ASSERT_EQ(compressed.const_dictionary_view().pq_len(), 16u);
+  ASSERT_EQ(compressed.const_manifest_view().pq_len(), 16u);
   EXPECT_THROW(cagra::build(res_, iterative_params(), std::as_const(compressed).view()),
                raft::exception);
 }

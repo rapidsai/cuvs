@@ -44,7 +44,7 @@ struct empty_spec {
       return data;
     }
     // NOTE: the shape accessors take the data in either form - the storage an owning dataset holds,
-    // or the view a `dataset_view` holds. A plain spec defines no dictionary either, so it ignores
+    // or the view a `dataset_view` holds. A plain spec defines no manifest either, so it ignores
     // whatever the dataset puts in that slot instead.
     [[nodiscard]] static auto get_n_rows(const auto&) noexcept -> index_type { return 0; }
     [[nodiscard]] static auto get_dim(const auto& data, const auto&) noexcept -> uint32_t

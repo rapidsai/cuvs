@@ -119,7 +119,7 @@ auto make_key(const cagra::search_params& params,
     reinterpret_cast<uint64_t>(dataset_norms),
     uint64_t(dataset.n_rows()),
     dataset.dim(),
-    uint32_t(reinterpret_cast<uint64_t>(dataset.dictionary_view().pq_code_book.data_handle()) >> 6),
+    uint32_t(reinterpret_cast<uint64_t>(dataset.manifest_view().pq_code_book.data_handle()) >> 6),
     uint32_t(params.team_size),
     uint32_t(metric),
     uint32_t(params.smem_dtype)};

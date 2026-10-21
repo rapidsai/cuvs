@@ -217,7 +217,7 @@ void transform(
   RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
   // Encode dataset
-  auto vq_centers     = quantizer.vpq_codebooks.const_dictionary_view().vq_code_book;
+  auto vq_centers     = quantizer.vpq_codebooks.const_manifest_view().vq_code_book;
   auto vq_labels_view = raft::make_device_vector_view<uint32_t, int64_t>(nullptr, 0);
   if (vq_labels.has_value()) { vq_labels_view = vq_labels.value(); }
 
@@ -226,7 +226,7 @@ void transform(
       res,
       to_vpq_params(quantizer.params_quantizer),
       dataset,
-      quantizer.vpq_codebooks.const_dictionary_view().pq_code_book,
+      quantizer.vpq_codebooks.const_manifest_view().pq_code_book,
       vq_centers,
       vq_labels_view,
       pq_codes_out);
@@ -235,7 +235,7 @@ void transform(
       res,
       to_vpq_params(quantizer.params_quantizer),
       dataset,
-      quantizer.vpq_codebooks.const_dictionary_view().pq_code_book,
+      quantizer.vpq_codebooks.const_manifest_view().pq_code_book,
       vq_centers,
       vq_labels_view,
       pq_codes_out);
@@ -356,15 +356,14 @@ void inverse_transform(
                "Codes matrix doesn't have the correct number of columns");
   RAFT_EXPECTS(quant.params_quantizer.pq_bits >= 4 && quant.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
-  reconstruct_vectors<T, T, idx_t, label_t>(
-    res,
-    quant.params_quantizer,
-    codes,
-    quant.vpq_codebooks.const_dictionary_view().pq_code_book,
-    quant.vpq_codebooks.const_dictionary_view().vq_code_book,
-    vq_labels,
-    out,
-    quant.params_quantizer.use_subspaces);
+  reconstruct_vectors<T, T, idx_t, label_t>(res,
+                                            quant.params_quantizer,
+                                            codes,
+                                            quant.vpq_codebooks.const_manifest_view().pq_code_book,
+                                            quant.vpq_codebooks.const_manifest_view().vq_code_book,
+                                            vq_labels,
+                                            out,
+                                            quant.params_quantizer.use_subspaces);
 }
 
 inline auto make_pq_params_from_vpq(const cuvs::neighbors::vpq_params& in_params,

@@ -569,7 +569,7 @@ void reconstruct_vpq_queries(raft::resources const& res,
                              raft::device_matrix_view<T, int64_t> output)
 {
   auto const codes         = vpq_view.data_const_view();
-  auto const books         = vpq_view.dictionary_view();
+  auto const books         = vpq_view.manifest_view();
   const uint32_t dim       = vpq_view.dim();
   const uint32_t pq_len    = books.pq_len();
   const uint32_t output_ld = static_cast<uint32_t>(output.extent(1));

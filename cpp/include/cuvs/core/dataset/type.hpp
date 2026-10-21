@@ -15,7 +15,7 @@
 namespace CUVS_EXPORT cuvs {
 
 /**
- * An owning dataset: the data and, for a compressed dataset, the dictionary that gives it meaning.
+ * An owning dataset: the data and, for a compressed dataset, the manifest that gives it meaning.
  * Ownership is unique, so the type is move-only whenever the underlying storage is.
  */
 template <typename T, typename IdxT, typename SpecT>
@@ -40,9 +40,9 @@ struct dataset {
     Optional slot that contains everything to give meaning to the encoded data;
     `std::monostate` for an uncompressed dataset.
    */
-  using dictionary_type            = typename view_type::dictionary_type;
-  using dictionary_view_type       = typename view_type::dictionary_view_type;
-  using const_dictionary_view_type = typename view_type::const_dictionary_view_type;
+  using manifest_type            = typename view_type::manifest_type;
+  using manifest_view_type       = typename view_type::manifest_view_type;
+  using const_manifest_view_type = typename view_type::const_manifest_view_type;
 
   static constexpr bool is_compressed = view_type::is_compressed;
 
@@ -52,21 +52,21 @@ struct dataset {
   {
   }
 
-  dataset(data_type&& data, dictionary_type&& dictionary)
+  dataset(data_type&& data, manifest_type&& manifest)
     requires(is_compressed)
-    : data_{std::move(data)}, dictionary_{std::move(dictionary)}
+    : data_{std::move(data)}, manifest_{std::move(manifest)}
   {
   }
 
   /**
-   * @brief A non-owning view of the whole dataset, data and dictionary alike.
+   * @brief A non-owning view of the whole dataset, data and manifest alike.
    *
    * @return A mutable view of the dataset.
    */
   [[nodiscard]] auto view() noexcept -> view_type
   {
     if constexpr (is_compressed) {
-      return view_type{data_view(), dictionary_view()};
+      return view_type{data_view(), manifest_view()};
     } else {
       return view_type{data_view()};
     }
@@ -79,7 +79,7 @@ struct dataset {
   [[nodiscard]] auto view() const noexcept -> const_view_type
   {
     if constexpr (is_compressed) {
-      return const_view_type{data_const_view(), const_dictionary_view()};
+      return const_view_type{data_const_view(), const_manifest_view()};
     } else {
       return const_view_type{data_const_view()};
     }
@@ -99,7 +99,7 @@ struct dataset {
   [[nodiscard]] auto dim() const noexcept -> uint32_t
   {
     // NOTE: a compressed dataset may not be able to tell its dimension from the encoded data alone
-    return spec_type::get_dim(data_, dictionary_);
+    return spec_type::get_dim(data_, manifest_);
   }
 
   /**
@@ -122,29 +122,29 @@ struct dataset {
   }
 
   /**
-   * @brief A non-owning view of the dictionary, such as the two codebooks of a VPQ dataset.
+   * @brief A non-owning view of the manifest, such as the two codebooks of a VPQ dataset.
    *
-   * @return A mutable view of the dictionary.
+   * @return A mutable view of the manifest.
    */
-  [[nodiscard]] auto dictionary_view() noexcept -> dictionary_view_type
+  [[nodiscard]] auto manifest_view() noexcept -> manifest_view_type
     requires(is_compressed)
   {
-    return spec_type::get_dictionary_view(dictionary_);
+    return spec_type::get_manifest_view(manifest_);
   }
   /**
-   * @brief A read-only view of the dictionary.
+   * @brief A read-only view of the manifest.
    *
-   * @return A read-only view of the dictionary.
+   * @return A read-only view of the manifest.
    */
-  [[nodiscard]] auto const_dictionary_view() const noexcept -> const_dictionary_view_type
+  [[nodiscard]] auto const_manifest_view() const noexcept -> const_manifest_view_type
     requires(is_compressed)
   {
-    return spec_type::get_dictionary_const_view(dictionary_);
+    return spec_type::get_manifest_const_view(manifest_);
   }
 
  private:
   data_type data_;
-  [[no_unique_address]] dictionary_type dictionary_;
+  [[no_unique_address]] manifest_type manifest_;
 };
 
 }  // namespace CUVS_EXPORT cuvs

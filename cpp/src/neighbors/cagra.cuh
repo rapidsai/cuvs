@@ -320,10 +320,10 @@ auto build(raft::resources const& res, const index_params& params, DatasetViewT 
     RAFT_EXPECTS(effective_params.metric == cuvs::distance::DistanceType::L2Expanded,
                  "cagra::build: a VPQ dataset supports only L2Expanded distance");
     RAFT_EXPECTS(dataset.n_rows() > 0, "cagra::build: VPQ dataset must not be empty");
-    RAFT_EXPECTS(dataset.dictionary_view().pq_bits() == 8,
+    RAFT_EXPECTS(dataset.manifest_view().pq_bits() == 8,
                  "cagra::build: VPQ dataset requires pq_bits == 8, got %u",
-                 dataset.dictionary_view().pq_bits());
-    auto const pq_len = dataset.dictionary_view().pq_len();
+                 dataset.manifest_view().pq_bits());
+    auto const pq_len = dataset.manifest_view().pq_len();
     RAFT_EXPECTS(pq_len == 2 || pq_len == 4 || pq_len == 8,
                  "cagra::build: VPQ dataset requires pq_len in {2, 4, 8}, got %u",
                  pq_len);

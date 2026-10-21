@@ -50,7 +50,7 @@ void decode_vpq_dataset(raft::device_matrix_view<data_t, int64_t> decoded_datase
                         cudaStream_t cuda_stream)
 {
   const auto dataset_size = decoded_dataset.extent(0);
-  const auto books        = vpq_dataset.const_dictionary_view();
+  const auto books        = vpq_dataset.const_manifest_view();
   const auto codes        = vpq_dataset.data_const_view();
   RAFT_EXPECTS(codes.extent(0) == dataset_size, "Dataset sizes mismatch");
   RAFT_EXPECTS(books.pq_bits() == 8,

@@ -22,7 +22,7 @@ namespace CUVS_EXPORT cuvs {
 
 /**
  * VQ+PQ compressed dataset specification, mirroring the VPQ dataset of cuvs/neighbors/common.hpp:
- * the two codebooks form the dictionary, while the data slot keeps the encoded rows - the VQ label
+ * the two codebooks form the manifest, while the data slot keeps the encoded rows - the VQ label
  * in the row prefix, followed by the packed PQ codes.
  *
  * `BookPolicy` is the container policy of the codebooks (elements of `MathT`) and `CodePolicy` the
@@ -44,14 +44,14 @@ struct vpq_spec {
   using book_type =
     raft::mdarray<math_type, raft::matrix_extent<uint32_t>, raft::layout_c_contiguous, BookPolicy>;
 
-  struct dictionary_type {
+  struct manifest_type {
     book_type vq_code_book;
     book_type pq_code_book;
   };
 
   // The views of the codebooks, writable or read-only alike.
   template <typename BookViewT>
-  struct dictionary_view_of {
+  struct manifest_view_of {
     BookViewT vq_code_book;
     BookViewT pq_code_book;
 
@@ -70,8 +70,8 @@ struct vpq_spec {
       return raft::div_rounding_up_safe(dim(), pq_len());
     }
   };
-  using dictionary_view_type       = dictionary_view_of<typename book_type::view_type>;
-  using const_dictionary_view_type = dictionary_view_of<typename book_type::const_view_type>;
+  using manifest_view_type       = manifest_view_of<typename book_type::view_type>;
+  using const_manifest_view_type = manifest_view_of<typename book_type::const_view_type>;
 
   template <typename T, typename IdxT>
   struct apply : storage_spec<IdxT> {
@@ -80,34 +80,34 @@ struct vpq_spec {
     using code_type  = uint8_t;
     // NOTE: re-exported rather than declared here, so that they do not belong to one instantiation
     // of `apply`; qualified lookup into `apply` does not reach the enclosing spec on its own.
-    using math_type                  = vpq_spec::math_type;
-    using book_type                  = vpq_spec::book_type;
-    using dictionary_type            = vpq_spec::dictionary_type;
-    using dictionary_view_type       = vpq_spec::dictionary_view_type;
-    using const_dictionary_view_type = vpq_spec::const_dictionary_view_type;
+    using math_type                = vpq_spec::math_type;
+    using book_type                = vpq_spec::book_type;
+    using manifest_type            = vpq_spec::manifest_type;
+    using manifest_view_type       = vpq_spec::manifest_view_type;
+    using const_manifest_view_type = vpq_spec::const_manifest_view_type;
 
     // NOTE: the data accessors are inherited; only `get_dim` differs from a dense dataset. Like the
-    // inherited ones, it reads the dictionary in either form: the codebooks an owning dataset
+    // inherited ones, it reads the manifest in either form: the codebooks an owning dataset
     // holds, or the views a `dataset_view` holds.
-    [[nodiscard]] static auto get_dim(const auto&, const auto& dict) noexcept -> uint32_t
+    [[nodiscard]] static auto get_dim(const auto&, const auto& manifest) noexcept -> uint32_t
     {
-      return static_cast<uint32_t>(dict.vq_code_book.extent(1));
+      return static_cast<uint32_t>(manifest.vq_code_book.extent(1));
     }
-    [[nodiscard]] static auto get_dictionary_view(dictionary_type& dict) noexcept
-      -> dictionary_view_type
+    [[nodiscard]] static auto get_manifest_view(manifest_type& manifest) noexcept
+      -> manifest_view_type
     {
-      return {dict.vq_code_book.view(), dict.pq_code_book.view()};
+      return {manifest.vq_code_book.view(), manifest.pq_code_book.view()};
     }
-    [[nodiscard]] static auto get_dictionary_const_view(const dictionary_type& dict) noexcept
-      -> const_dictionary_view_type
+    [[nodiscard]] static auto get_manifest_const_view(const manifest_type& manifest) noexcept
+      -> const_manifest_view_type
     {
-      return {dict.vq_code_book.view(), dict.pq_code_book.view()};
+      return {manifest.vq_code_book.view(), manifest.pq_code_book.view()};
     }
-    [[nodiscard]] static auto get_dictionary_const_view(dictionary_view_type dict) noexcept
-      -> const_dictionary_view_type
+    [[nodiscard]] static auto get_manifest_const_view(manifest_view_type manifest) noexcept
+      -> const_manifest_view_type
     {
-      return {raft::make_const_mdspan(dict.vq_code_book),
-              raft::make_const_mdspan(dict.pq_code_book)};
+      return {raft::make_const_mdspan(manifest.vq_code_book),
+              raft::make_const_mdspan(manifest.pq_code_book)};
     }
     // The length of an encoded row in bytes, including the inlined VQ label.
     [[nodiscard]] static auto get_encoded_row_length(const auto& data) noexcept -> uint32_t

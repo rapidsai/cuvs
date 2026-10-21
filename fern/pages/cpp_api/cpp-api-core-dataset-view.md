@@ -13,7 +13,7 @@ _Source header: `cuvs/core/dataset/view.hpp`_
 
 A non-owning view of a dataset: a view of the data and, for a compressed dataset, a view of the
 
-dictionary that gives it meaning. Cheap to copy and to pass by value, like an mdspan.
+manifest that gives it meaning. Cheap to copy and to pass by value, like an mdspan.
 
 ```cpp
 template <typename T, typename IdxT, typename SpecT>

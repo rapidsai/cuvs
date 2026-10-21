@@ -444,8 +444,8 @@ auto deserialize_vpq(raft::resources const& res, std::istream& is)
 
   return std::make_unique<device_vpq_dataset<DataT, IdxT>>(
     std::move(data),
-    typename device_vpq_dataset<DataT, IdxT>::dictionary_type{std::move(vq_code_book),
-                                                              std::move(pq_code_book)});
+    typename device_vpq_dataset<DataT, IdxT>::manifest_type{std::move(vq_code_book),
+                                                            std::move(pq_code_book)});
 }
 
 template <typename DataT, typename IdxT, typename OwningDatasetT, typename Input>
