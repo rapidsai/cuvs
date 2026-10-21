@@ -1321,6 +1321,7 @@ def merged_dataset_offsets(indices, filter=None, resources=None):
 
     cdef Index idx
     cdef size_t i
+    cdef int64_t[::1] offsets_view
     try:
         for i in range(num_indices):
             idx = indices[i]
@@ -1329,7 +1330,7 @@ def merged_dataset_offsets(indices, filter=None, resources=None):
             check_cuvs(cuvsCagraIndexGetDatasetHandle(idx.index, &c_datasets[i]))
 
         offsets = np.empty(num_indices + 1, dtype=np.int64)
-        cdef int64_t[::1] offsets_view = offsets
+        offsets_view = offsets
 
         with cuda_interruptible():
             check_cuvs(cuvsMergedDatasetOffsets(
