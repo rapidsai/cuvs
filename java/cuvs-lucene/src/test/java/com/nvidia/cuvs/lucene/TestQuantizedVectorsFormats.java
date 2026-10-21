@@ -4,6 +4,7 @@
  */
 package com.nvidia.cuvs.lucene;
 
+import static com.nvidia.cuvs.lucene.TestUtils.assertVectorsKeepTheirDocuments;
 import static com.nvidia.cuvs.lucene.ThreadLocalCuVSResourcesProvider.isSupported;
 import static org.apache.lucene.index.VectorSimilarityFunction.COSINE;
 import static org.apache.lucene.index.VectorSimilarityFunction.EUCLIDEAN;
@@ -25,6 +26,7 @@ import org.apache.lucene.index.FloatVectorValues;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.LogDocMergePolicy;
 import org.apache.lucene.index.VectorEncoding;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
@@ -74,10 +76,12 @@ public class TestQuantizedVectorsFormats extends BaseKnnVectorsFormatTestCase {
     }
 
     try (Directory dir = newDirectory(new ByteBuffersDirectory());
-        IndexWriter w = new IndexWriter(dir, newIndexWriterConfig())) {
+        // A random merge policy could merge the two segments before they are checked.
+        IndexWriter w =
+            new IndexWriter(dir, newIndexWriterConfig().setMergePolicy(new LogDocMergePolicy()))) {
       for (int i = 0; i < R; i++) {
         Document doc = new Document();
-        doc.add(new StringField("id", String.valueOf(i), Field.Store.NO));
+        doc.add(new StringField("id", String.valueOf(i), Field.Store.YES));
         doc.add(new KnnFloatVectorField(F, f[i], EUCLIDEAN));
         w.addDocument(doc);
         w.commit();
@@ -95,12 +99,7 @@ public class TestQuantizedVectorsFormats extends BaseKnnVectorsFormatTestCase {
 
       try (DirectoryReader reader = DirectoryReader.open(w)) {
         LeafReader r = getOnlyLeafReader(reader);
-        FloatVectorValues values = r.getFloatVectorValues(F);
-        assertNotNull(values);
-        assertEquals(R, values.size());
-        for (int i = 0; i < R; i++) {
-          assertArrayEquals(f[i], values.vectorValue(i), 0.0f);
-        }
+        assertVectorsKeepTheirDocuments(r, F, f);
       }
     }
   }
@@ -121,7 +120,7 @@ public class TestQuantizedVectorsFormats extends BaseKnnVectorsFormatTestCase {
 
       for (int i = 0; i < R; i++) {
         Document doc = new Document();
-        doc.add(new StringField("id", String.valueOf(i), Field.Store.NO));
+        doc.add(new StringField("id", String.valueOf(i), Field.Store.YES));
         doc.add(new KnnFloatVectorField(F1, f1[i], EUCLIDEAN));
         doc.add(new KnnFloatVectorField(F2, f2[i], EUCLIDEAN));
         w.addDocument(doc);
@@ -130,19 +129,8 @@ public class TestQuantizedVectorsFormats extends BaseKnnVectorsFormatTestCase {
 
       try (DirectoryReader reader = DirectoryReader.open(w)) {
         LeafReader r = getOnlyLeafReader(reader);
-        FloatVectorValues values = r.getFloatVectorValues(F1);
-        assertNotNull(values);
-        assertEquals(R, values.size());
-        for (int i = 0; i < R; i++) {
-          assertArrayEquals(f1[i], values.vectorValue(i), 0.0f);
-        }
-
-        values = r.getFloatVectorValues(F2);
-        assertNotNull(values);
-        assertEquals(R, values.size());
-        for (int i = 0; i < R; i++) {
-          assertArrayEquals(f2[i], values.vectorValue(i), 0.0f);
-        }
+        assertVectorsKeepTheirDocuments(r, F1, f1);
+        assertVectorsKeepTheirDocuments(r, F2, f2);
       }
     }
   }

@@ -24,7 +24,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
   @Before
   public void setup() {
-    assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxAmd64());
+    assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxSupportedArch());
     initializeRandom();
     log.trace("Random context initialized for test.");
   }
@@ -35,7 +35,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
     DEVICE
   }
 
-  @Ignore // https://github.com/nvidia/cuvs/issues/1468
+  @Ignore // https://github.com/NVIDIA/cuvs/issues/1468
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
     TestDatasetMemoryKind[] testDatasetMemoryKinds = {

@@ -26,6 +26,7 @@ import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -264,6 +265,11 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
+  public VamanaIndex.Builder newVamanaIndexBuilder(CuVSResources cuVSResources) {
+    return VamanaIndexImpl.newBuilder(Objects.requireNonNull(cuVSResources));
+  }
+
+  @Override
   public FilterBitsetHandle newFilterBitsetHandle(long[] combinedLongs) {
     return new FilterBitsetHandleImpl(combinedLongs);
   }
@@ -302,24 +308,14 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) {
-    if (indexes == null || indexes.length == 0) {
-      throw new IllegalArgumentException("At least one index must be provided for merging");
-    }
-    return CagraIndexImpl.merge(indexes);
-  }
-
-  @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraIndexParams mergeParams) {
-    if (indexes == null || indexes.length == 0) {
-      throw new IllegalArgumentException("At least one index must be provided for merging");
-    }
-    return CagraIndexImpl.merge(indexes, mergeParams);
-  }
-
-  @Override
   public boolean isCagraPaddedDataset(CuVSMatrix dataset) {
     return CagraIndexImpl.isPaddedDataset(dataset);
+  }
+
+  @Override
+  public CagraIndex mergeCagraIndexes(
+      CagraIndex[] indexes, CagraIndexParams mergeParams, BitSet rowFilter) {
+    return CagraIndexImpl.merge(indexes, mergeParams, rowFilter);
   }
 
   @Override
@@ -626,7 +622,8 @@ final class JDKProvider implements CuVSProvider {
     return dataset;
   }
 
-  private abstract static class MatrixBuilder<T extends CuVSMatrixInternal> {
+  private abstract static class MatrixBuilder<T extends CuVSMatrixInternal>
+      implements AutoCloseable {
 
     protected final long columns;
     protected final long size;
@@ -635,6 +632,7 @@ final class JDKProvider implements CuVSProvider {
     protected final long rowSize;
     protected final long rowBytes;
     protected int currentRow;
+    private boolean closed;
 
     protected MatrixBuilder(T matrix, long size, long columns) {
       this.columns = columns;
@@ -644,6 +642,7 @@ final class JDKProvider implements CuVSProvider {
       this.rowSize = columns * elementSize;
       this.rowBytes = rowSize;
       this.currentRow = 0;
+      this.closed = false;
     }
 
     protected MatrixBuilder(T matrix, long size, long columns, int rowStride) {
@@ -655,9 +654,11 @@ final class JDKProvider implements CuVSProvider {
       this.rowBytes = columns * elementSize;
 
       this.currentRow = 0;
+      this.closed = false;
     }
 
     public void addVector(float[] vector) {
+      ensureOpen();
       if (vector.length != columns) {
         throw new IllegalArgumentException(
             String.format(
@@ -667,6 +668,7 @@ final class JDKProvider implements CuVSProvider {
     }
 
     public void addVector(byte[] vector) {
+      ensureOpen();
       if (vector.length != columns) {
         throw new IllegalArgumentException(
             String.format(
@@ -676,6 +678,7 @@ final class JDKProvider implements CuVSProvider {
     }
 
     public void addVector(int[] vector) {
+      ensureOpen();
       if (vector.length != columns) {
         throw new IllegalArgumentException(
             String.format(
@@ -685,12 +688,34 @@ final class JDKProvider implements CuVSProvider {
     }
 
     public void addVector(short[] vector) {
+      ensureOpen();
       if (vector.length != columns) {
         throw new IllegalArgumentException(
             String.format(
                 Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
       }
       internalAddVector(MemorySegment.ofArray(vector));
+    }
+
+    protected final T transferOwnership() {
+      ensureOpen();
+      closed = true;
+      return matrix;
+    }
+
+    protected final void ensureOpen() {
+      if (closed) {
+        throw new IllegalStateException("matrix builder is closed");
+      }
+    }
+
+    @Override
+    public final void close() {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      matrix.close();
     }
 
     protected abstract void internalAddVector(MemorySegment vector);
@@ -781,11 +806,12 @@ final class JDKProvider implements CuVSProvider {
 
     @Override
     public CuVSDeviceMatrix build() {
+      ensureOpen();
       try (var access = resources.access()) {
         var hostBuffer = CuVSResourcesImpl.getHostBuffer(access);
         flushBuffer(hostBuffer);
       }
-      return matrix;
+      return transferOwnership();
     }
   }
 
@@ -840,7 +866,7 @@ final class JDKProvider implements CuVSProvider {
 
     @Override
     public CuVSDeviceMatrix build() {
-      return matrix;
+      return transferOwnership();
     }
   }
 
@@ -870,7 +896,7 @@ final class JDKProvider implements CuVSProvider {
 
     @Override
     public CuVSHostMatrix build() {
-      return matrix;
+      return transferOwnership();
     }
   }
 }

@@ -15,6 +15,7 @@ import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.codecs.hnsw.FlatVectorsFormat;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
+import org.apache.lucene.search.TaskExecutor;
 
 /**
  * cuVS based Scalar Quantized KnnVectorsFormat for indexing on GPU and searching on the CPU.
@@ -71,17 +72,20 @@ public class LuceneAcceleratedHNSWScalarQuantizedVectorsFormat extends KnnVector
       return new LuceneAcceleratedHNSWScalarQuantizedVectorsWriter(
           state, acceleratedHNSWParams, flatWriter);
     } else {
+      // Builds the graph on the CPU over the scalar-quantized flat writer opened above, which is
+      // what Lucene99HnswScalarQuantizedVectorsFormat writes, so the reader below reads it.
+      log.warning(
+          "GPU based indexing not supported, falling back to using the Lucene99HnswVectorsWriter");
       try {
-        // Fallback to Lucene's Lucene99HnswScalarQuantizedVectorsFormat
-        log.warning(
-            "GPU based indexing not supported, falling back to using the"
-                + " Lucene99HnswScalarQuantizedVectorsFormat");
-        KnnVectorsFormat fallbackFormat =
-            LUCENE_PROVIDER.getLuceneHnswScalarQuantizedVectorsFormatInstance(
-                acceleratedHNSWParams.getBeamWidth(), acceleratedHNSWParams.getMaxConn());
-        return fallbackFormat.fieldsWriter(state);
+        return LUCENE_PROVIDER.getLuceneHnswVectorsWriterInstance(
+            state,
+            acceleratedHNSWParams.getMaxConn(),
+            acceleratedHNSWParams.getBeamWidth(),
+            flatWriter,
+            acceleratedHNSWParams.getNumMergeWorkers(),
+            new TaskExecutor(acceleratedHNSWParams.getMergeExec()));
       } catch (Exception e) {
-        throw new RuntimeException(e.getMessage());
+        throw Utils.handleThrowable(e);
       }
     }
   }
@@ -95,7 +99,7 @@ public class LuceneAcceleratedHNSWScalarQuantizedVectorsFormat extends KnnVector
       return LUCENE_PROVIDER.getLuceneHnswVectorsReaderInstance(
           state, FLAT_VECTORS_FORMAT.fieldsReader(state));
     } catch (Exception e) {
-      throw new RuntimeException(e.getMessage());
+      throw Utils.handleThrowable(e);
     }
   }
 
