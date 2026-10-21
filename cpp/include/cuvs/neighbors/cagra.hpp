@@ -747,7 +747,7 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
   }
 
   /**
-   * Replace the source indices with a new source indices taking the ownership of the passed
+   * @brief Replace the source indices with a new source indices taking the ownership of the passed
    * vector.
    */
   void update_source_indices(raft::device_vector<index_type, int64_t>&& source_indices)

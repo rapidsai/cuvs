@@ -576,13 +576,11 @@ We create a copy of the graph on the device. The index manages the lifetime of t
 <a id="neighbors-cagra-index-update-source-indices"></a>
 ### neighbors::cagra::index::update_source_indices
 
-Replace the source indices with a new source indices taking the ownership of the passed
+Replace the source indices with a new source indices taking the ownership of the passed vector.
 
 ```cpp
 void update_source_indices(raft::device_vector<index_type, int64_t>&& source_indices);
 ```
-
-vector.
 
 **Parameters**
 
