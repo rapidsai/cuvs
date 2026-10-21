@@ -180,8 +180,8 @@ struct ace_params {
    *
    * Small values might improve recall but potentially degrade performance and
    * increase memory usage. Partitions should not be too small to prevent issues
-   * in KNN graph construction. The partition size is on average (1 + nsubpartitions) * (n_rows /
-   * npartitions) * dim * sizeof(T), accounting for the core and augmented vectors. Please account
+   * in KNN graph construction. The partition size is on average `(1 + nsubpartitions) * (n_rows /
+   * npartitions) * dim * sizeof(T)`, accounting for the core and augmented vectors. Please account
    * for imbalance in the partition sizes (up to 3x in our tests).
    *
    * If the specified number of partitions results in partitions that exceed
