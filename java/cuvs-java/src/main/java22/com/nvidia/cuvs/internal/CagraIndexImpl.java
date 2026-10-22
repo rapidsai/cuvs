@@ -209,6 +209,9 @@ public class CagraIndexImpl implements CagraIndex {
 
         var cuvsRes = resourcesAccessor.handle();
 
+        // TODO: do we need a stream sync here?
+        checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
+
         datasetView =
             isCagraPaddedLayout(dataset)
                 ? makePaddedViewHandle(cuvsRes, dataset, localArena)
@@ -1238,7 +1241,9 @@ public class CagraIndexImpl implements CagraIndex {
 
       var mergedIndex = createCagraIndex();
       CagraIndexImpl merged = null;
+      int numWriterThreads = mergeParams != null ? mergeParams.getNumWriterThreads() : 0;
       try (var nativeMergeParams = segmentFromIndexParams(mergeParams);
+          var ompThreads = OmpThreadScope.of(numWriterThreads);
           var resourcesAccessor = resources.access()) {
         var cuvsRes = resourcesAccessor.handle();
 

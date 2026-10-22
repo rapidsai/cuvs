@@ -29,11 +29,11 @@ public class OmpThreadsIT extends CuVSTestCase {
     assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxSupportedArch());
     initializeRandom();
     var symbol =
-        SymbolLookup.libraryLookup("libgomp.so.1", Arena.global()).find("omp_get_max_threads");
-    assumeTrue("libgomp symbols not visible", symbol.isPresent());
+        SymbolLookup.libraryLookup("libgomp.so.1", Arena.global())
+            .find("omp_get_max_threads")
+            .orElseThrow();
     ompGetMaxThreads =
-        Linker.nativeLinker()
-            .downcallHandle(symbol.get(), FunctionDescriptor.of(ValueLayout.JAVA_INT));
+        Linker.nativeLinker().downcallHandle(symbol, FunctionDescriptor.of(ValueLayout.JAVA_INT));
   }
 
   private int ompMaxThreads() throws Throwable {
@@ -63,6 +63,30 @@ public class OmpThreadsIT extends CuVSTestCase {
         var dataset = CuVSMatrix.ofArray(createFloatMatrix(2000, 32))) {
       int before = ompMaxThreads();
       try (var index = CagraIndex.newBuilder(resources).withDataset(dataset).build()) {
+        assertEquals(before, ompMaxThreads());
+      }
+    }
+  }
+
+  @Test
+  public void testCagraMergeRestoresOmpThreads() throws Throwable {
+    var params =
+        new CagraIndexParams.Builder()
+            .withCagraGraphBuildAlgo(CagraIndexParams.CagraGraphBuildAlgo.NN_DESCENT)
+            .withNumWriterThreads(3)
+            .build();
+    try (var resources = CheckedCuVSResources.create();
+        var dataset1 = CuVSMatrix.ofArray(createFloatMatrix(2000, 32)).toDevice(resources);
+        var dataset2 = CuVSMatrix.ofArray(createFloatMatrix(2000, 32)).toDevice(resources);
+        var index1 =
+            CagraIndex.newBuilder(resources).withDataset(dataset1).withIndexParams(params).build();
+        var index2 =
+            CagraIndex.newBuilder(resources)
+                .withDataset(dataset2)
+                .withIndexParams(params)
+                .build()) {
+      int before = ompMaxThreads();
+      try (var merged = CagraIndex.merge(new CagraIndex[] {index1, index2}, params)) {
         assertEquals(before, ompMaxThreads());
       }
     }
