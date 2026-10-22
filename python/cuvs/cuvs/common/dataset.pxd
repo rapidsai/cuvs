@@ -7,6 +7,7 @@
 from libc.stdint cimport uint32_t
 from libcpp cimport bool
 
+from cuvs.cluster.kmeans.kmeans cimport cuvsKMeansType
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 
@@ -19,6 +20,9 @@ cdef extern from "cuvs/preprocessing/quantize/pq.h" nogil:
         bool use_vq
         uint32_t vq_n_centers
         uint32_t kmeans_n_iters
+        cuvsKMeansType pq_kmeans_type
+        uint32_t max_train_points_per_pq_code
+        uint32_t max_train_points_per_vq_cluster
 
     ctypedef cuvsProductQuantizerParams* cuvsProductQuantizerParams_t
 

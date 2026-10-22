@@ -61,83 +61,6 @@ from cuvs.preprocessing.quantize.pq.pq cimport (
 )
 
 
-cdef class CompressionParams:
-    """
-    Parameters for PQ compression (CAGRA-Q).
-
-    Train a PQ dataset with :func:`make_pq_dataset`, then attach it with
-    :func:`update_dataset`. Metric must remain ``sqeuclidean`` / L2Expanded.
-
-    Parameters
-    ----------
-    pq_bits: int
-        The bit length of the vector element after compression by PQ.
-        Possible values: [4, 5, 6, 7, 8]. The smaller the 'pq_bits', the
-        smaller the index size and the better the search performance, but
-        the lower the recall.
-    pq_dim: int
-        The dimensionality of the vector after compression by PQ. When zero,
-        an optimal value is selected using a heuristic.
-    vq_n_centers: int
-        Vector Quantization (VQ) codebook size - number of "coarse cluster
-        centers". When zero, an optimal value is selected using a heuristic.
-    kmeans_n_iters: int
-        The number of iterations searching for kmeans centers (both VQ & PQ
-        phases).
-    vq_kmeans_trainset_fraction: float
-        The fraction of data to use during iterative kmeans building (VQ
-        phase). When zero, an optimal value is selected using a heuristic.
-    pq_kmeans_trainset_fraction: float
-        The fraction of data to use during iterative kmeans building (PQ
-        phase). When zero, an optimal value is selected using a heuristic.
-    """
-    cdef cuvsCagraCompressionParams * params
-
-    def __cinit__(self):
-        check_cuvs(cuvsCagraCompressionParamsCreate(&self.params))
-
-    def __dealloc__(self):
-        check_cuvs(cuvsCagraCompressionParamsDestroy(self.params))
-
-    def __init__(self, *,
-                 pq_bits=8,
-                 pq_dim=0,
-                 vq_n_centers=0,
-                 kmeans_n_iters=25,
-                 vq_kmeans_trainset_fraction=0.0,
-                 pq_kmeans_trainset_fraction=0.0):
-        self.params.pq_bits = pq_bits
-        self.params.pq_dim = pq_dim
-        self.params.vq_n_centers = vq_n_centers
-        self.params.kmeans_n_iters = kmeans_n_iters
-        self.params.vq_kmeans_trainset_fraction = vq_kmeans_trainset_fraction
-        self.params.pq_kmeans_trainset_fraction = pq_kmeans_trainset_fraction
-
-    @property
-    def pq_bits(self):
-        return self.params.pq_bits
-
-    @property
-    def pq_dim(self):
-        return self.params.pq_dim
-
-    @property
-    def vq_n_centers(self):
-        return self.params.vq_n_centers
-
-    @property
-    def kmeans_n_iters(self):
-        return self.params.kmeans_n_iters
-
-    @property
-    def vq_kmeans_trainset_fraction(self):
-        return self.params.vq_kmeans_trainset_fraction
-
-    @property
-    def pq_kmeans_trainset_fraction(self):
-        return self.params.pq_kmeans_trainset_fraction
-
-
 cdef class AceParams:
     """
     Parameters for ACE (Augmented Core Extraction) graph building algorithm.
@@ -688,7 +611,6 @@ def update_dataset(Index index, dataset, resources=None):
         source_array = dataset
         dataset_obj = make_device_padded_dataset(dataset, resources=resources)
 
-    cdef cuvsDataset_t dataset_handle = _cagra_dataset_handle(dataset_obj)
     if dataset_obj.layout not in ("padded", "pq"):
         raise TypeError("dataset must have padded or PQ layout")
 

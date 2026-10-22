@@ -514,8 +514,6 @@ navigation:
             path: "./pages/java_api/java-api-com-nvidia-cuvs-bruteforceindexparams.md"
           - page: "BruteForceQuery"
             path: "./pages/java_api/java-api-com-nvidia-cuvs-bruteforcequery.md"
-          - page: "CagraCompressionParams"
-            path: "./pages/java_api/java-api-com-nvidia-cuvs-cagracompressionparams.md"
           - page: "CagraIndex"
             path: "./pages/java_api/java-api-com-nvidia-cuvs-cagraindex.md"
           - page: "CagraIndexParams"

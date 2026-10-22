@@ -48,10 +48,10 @@ pub use index::{DeserializedIndex, Index};
 
 _Source: `rust/cuvs/src/neighbors/cagra/mod.rs:27`_
 
-## params::\{CompressionParams, IndexParams, ProductQuantizerParams, SearchParams\}
+## params::\{IndexParams, ProductQuantizerParams, SearchParams\}
 
 ```rust
-pub use params::{CompressionParams, IndexParams, ProductQuantizerParams, SearchParams};
+pub use params::{IndexParams, ProductQuantizerParams, SearchParams};
 ```
 
 _Source: `rust/cuvs/src/neighbors/cagra/mod.rs:28`_

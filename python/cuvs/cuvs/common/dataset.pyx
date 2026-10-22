@@ -154,7 +154,22 @@ def make_device_padded_dataset(dataset, resources=None):
 
 @auto_sync_resources
 def make_device_pq_dataset(params, dataset, resources=None):
-    """Create an owning device PQ dataset."""
+    """
+    Create an owning device PQ dataset.
+
+    Parameters
+    ----------
+    params : cuvs.preprocessing.quantize.pq.QuantizerParams
+        PQ training parameters.
+    dataset : Dataset or array interface compliant matrix
+        Source vectors, shape ``(n_samples, dim)``.
+    {resources_docstring}
+
+    Returns
+    -------
+    dataset : Dataset
+        An owning device PQ dataset handle.
+    """
     cdef Dataset dense
     cdef Dataset pq = Dataset()
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
@@ -175,13 +190,15 @@ def make_device_pq_dataset(params, dataset, resources=None):
     try:
         c_params.pq_bits = params.pq_bits
         c_params.pq_dim = params.pq_dim
-        c_params.use_subspaces = True
-        # vq_n_centers == 1 means PQ only; 0 selects the VQ size heuristic.
-        c_params.use_vq = params.vq_n_centers != 1
+        c_params.use_subspaces = params.use_subspaces
+        c_params.use_vq = params.use_vq
         c_params.vq_n_centers = params.vq_n_centers
         c_params.kmeans_n_iters = params.kmeans_n_iters
-        # The trainset fractions have no ProductQuantizerParams equivalent
-        # (training is bounded by max_train_points_* instead) and are ignored.
+        c_params.pq_kmeans_type = <cuvsKMeansType><int>params.pq_kmeans_type
+        c_params.max_train_points_per_pq_code = \
+            params.max_train_points_per_pq_code
+        c_params.max_train_points_per_vq_cluster = \
+            params.max_train_points_per_vq_cluster
 
         check_cuvs(cuvsDatasetMakePQ(
             res,

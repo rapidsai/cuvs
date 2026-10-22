@@ -6,7 +6,6 @@ from cuvs.common.dataset import Dataset
 
 from .cagra import (
     AceParams,
-    CompressionParams,
     ExtendParams,
     Index,
     IndexParams,
@@ -23,7 +22,6 @@ from .cagra import (
 
 __all__ = [
     "AceParams",
-    "CompressionParams",
     "Dataset",
     "ExtendParams",
     "Index",

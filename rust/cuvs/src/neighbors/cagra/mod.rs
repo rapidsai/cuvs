@@ -25,7 +25,7 @@ pub use crate::dataset::{
 };
 pub use crate::neighbors::filters::{Bitset, Filter};
 pub use index::{DeserializedIndex, Index};
-pub use params::{CompressionParams, IndexParams, ProductQuantizerParams, SearchParams};
+pub use params::{IndexParams, ProductQuantizerParams, SearchParams};
 
 use crate::dlpack::DLPackError;
 use crate::error::LibraryError;

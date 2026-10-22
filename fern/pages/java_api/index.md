@@ -28,7 +28,6 @@ For the Apache Lucene codecs built on this API, see the [Lucene API Documentatio
 - [BruteForceIndex](/api-reference/java-api-com-nvidia-cuvs-bruteforceindex)
 - [BruteForceIndexParams](/api-reference/java-api-com-nvidia-cuvs-bruteforceindexparams)
 - [BruteForceQuery](/api-reference/java-api-com-nvidia-cuvs-bruteforcequery)
-- [CagraCompressionParams](/api-reference/java-api-com-nvidia-cuvs-cagracompressionparams)
 - [CagraIndex](/api-reference/java-api-com-nvidia-cuvs-cagraindex)
 - [CagraIndexParams](/api-reference/java-api-com-nvidia-cuvs-cagraindexparams)
 - [CagraMergeParams](/api-reference/java-api-com-nvidia-cuvs-cagramergeparams)
