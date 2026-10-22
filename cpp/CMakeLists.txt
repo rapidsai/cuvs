@@ -1637,6 +1637,8 @@ if(NOT BUILD_CPU_ONLY)
   )
 
   if(NOT cuvs_compile_mode STREQUAL "static_only")
+    include(cmake/modules/kernel_dedup.cmake)
+
     add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
     add_library(cuvs::cuvs ALIAS cuvs)
     set_target_properties(
