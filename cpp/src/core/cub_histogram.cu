@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "../distance/top_1_nn.cuh"
 #include "cub_histogram.hpp"
+#include <cuvs/core/cuda_fp16.hpp>
 
 #include <cub/device/device_histogram.cuh>
 #include <raft/util/cudart_utils.hpp>
