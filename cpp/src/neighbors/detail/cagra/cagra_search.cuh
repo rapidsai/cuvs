@@ -35,7 +35,7 @@
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
-#include <raft/matrix/select_k.cuh>
+#include <cuvs/selection/select_k.hpp>
 
 #include <cstddef>
 
@@ -565,7 +565,7 @@ void search_multi_partition(
 
     // Transpose intermediate_distances from [num_partitions, chunk_queries, per_partition_topk] to
     // [chunk_queries, num_partitions * per_partition_topk] so batched select_k can pick the global
-    // top-k per query. (raft::matrix::select_k requires row-major contiguous input.)
+    // top-k per query. (cuvs::selection::select_k requires row-major contiguous input.)
     {
       const DistanceT* src     = intermediate_distances;
       const int64_t row_stride = static_cast<int64_t>(num_partitions) * per_partition_topk;
@@ -597,7 +597,7 @@ void search_multi_partition(
     // Cosine transform applied here) are smaller-is-closer, while InnerProduct is larger-is-closer.
     const bool select_min = cuvs::distance::is_min_close(metric);
 
-    raft::matrix::select_k<DistanceT, uint32_t>(
+    cuvs::selection::select_k(
       res,
       raft::make_device_matrix_view<const DistanceT, int64_t, raft::row_major>(
         transposed_distances,
