@@ -63,6 +63,27 @@ public final class CuVSCodecs {
   }
 
   /**
+   * Returns the vectors format used by {@link #acceleratedHNSW()}, for use with a per-field codec.
+   *
+   * @return the vectors format
+   */
+  public static KnnVectorsFormat acceleratedHNSWFormat() {
+    return acceleratedHNSWFormat(new AcceleratedHNSWParams.Builder().build());
+  }
+
+  /**
+   * Returns the vectors format used by {@link #acceleratedHNSW(AcceleratedHNSWParams)}, for use
+   * with a per-field codec.
+   *
+   * @param params the index build parameters
+   * @return the vectors format
+   */
+  public static KnnVectorsFormat acceleratedHNSWFormat(AcceleratedHNSWParams params) {
+    LuceneVersionGuard.ensureCompatible();
+    return LuceneCompat.acceleratedHNSWFormat(params);
+  }
+
+  /**
    * Returns the codec that builds HNSW graphs on the GPU over scalar-quantized vectors, with
    * default parameters.
    *
@@ -81,6 +102,16 @@ public final class CuVSCodecs {
   public static Codec acceleratedHNSWScalarQuantized(AcceleratedHNSWParams params) {
     LuceneVersionGuard.ensureCompatible();
     return LuceneCompat.acceleratedHNSWScalarQuantizedCodec(params);
+  }
+
+  /**
+   * Returns the vectors format used by {@link #acceleratedHNSWScalarQuantized()}, for use with a
+   * per-field codec.
+   *
+   * @return the vectors format
+   */
+  public static KnnVectorsFormat acceleratedHNSWScalarQuantizedFormat() {
+    return acceleratedHNSWScalarQuantizedFormat(new AcceleratedHNSWParams.Builder().build());
   }
 
   /**
@@ -118,6 +149,29 @@ public final class CuVSCodecs {
   }
 
   /**
+   * Returns the vectors format used by {@link #acceleratedHNSWBinaryQuantized()}, for use with a
+   * per-field codec.
+   *
+   * @return the vectors format
+   */
+  public static KnnVectorsFormat acceleratedHNSWBinaryQuantizedFormat() {
+    return acceleratedHNSWBinaryQuantizedFormat(new AcceleratedHNSWParams.Builder().build());
+  }
+
+  /**
+   * Returns the vectors format used by {@link
+   * #acceleratedHNSWBinaryQuantized(AcceleratedHNSWParams)}, for use with a per-field codec.
+   *
+   * @param params the index build parameters
+   * @return the vectors format
+   */
+  public static KnnVectorsFormat acceleratedHNSWBinaryQuantizedFormat(
+      AcceleratedHNSWParams params) {
+    LuceneVersionGuard.ensureCompatible();
+    return LuceneCompat.acceleratedHNSWBinaryQuantizedFormat(params);
+  }
+
+  /**
    * Returns the codec that both builds and searches CAGRA indexes on the GPU, with default
    * parameters.
    *
@@ -148,5 +202,39 @@ public final class CuVSCodecs {
   public static Codec gpuSearch(GPUSearchParams params, FilterBitsetCacheConfig filterCacheConfig) {
     LuceneVersionGuard.ensureCompatible();
     return LuceneCompat.gpuSearchCodec(params, filterCacheConfig);
+  }
+
+  /**
+   * Returns the vectors format used by {@link #gpuSearch()}, for use with a per-field codec.
+   *
+   * @return the vectors format
+   */
+  public static KnnVectorsFormat gpuSearchFormat() {
+    return gpuSearchFormat(new GPUSearchParams.Builder().build());
+  }
+
+  /**
+   * Returns the vectors format used by {@link #gpuSearch(GPUSearchParams)}, for use with a
+   * per-field codec.
+   *
+   * @param params the GPU index and search parameters
+   * @return the vectors format
+   */
+  public static KnnVectorsFormat gpuSearchFormat(GPUSearchParams params) {
+    return gpuSearchFormat(params, FilterBitsetCacheConfig.DEFAULT);
+  }
+
+  /**
+   * Returns the vectors format used by {@link #gpuSearch(GPUSearchParams,
+   * FilterBitsetCacheConfig)}, for use with a per-field codec.
+   *
+   * @param params the GPU index and search parameters
+   * @param filterCacheConfig the filter-bitset-cache configuration
+   * @return the vectors format
+   */
+  public static KnnVectorsFormat gpuSearchFormat(
+      GPUSearchParams params, FilterBitsetCacheConfig filterCacheConfig) {
+    LuceneVersionGuard.ensureCompatible();
+    return LuceneCompat.gpuSearchFormat(params, filterCacheConfig);
   }
 }

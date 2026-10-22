@@ -27,7 +27,12 @@ SPDX-License-Identifier: Apache-2.0
   <build>
     <plugins>
       <plugin>
-        <!-- The fat jar; see the parent pom for why each module declares it. -->
+        <!--
+            Builds cuvs-lucene-10.2-<version>-jar-with-dependencies.jar: this module's classes together
+            with its runtime dependencies (such as cuvs-java), with their META-INF/services files
+            merged. It is configured in the parent's pluginManagement, but each module declares it
+            itself: declared in the parent's plugins, it would also build a fat jar for the parent pom.
+        -->
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-assembly-plugin</artifactId>
       </plugin>

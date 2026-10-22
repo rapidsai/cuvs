@@ -46,11 +46,8 @@ public class TestQuantizedVectorsFormats extends BaseCuVSKnnVectorsFormatTestCas
   public static List<Object[]> parameters() {
     return Arrays.asList(
         new Object[][] {
-          {new LuceneAcceleratedHNSWBinaryQuantizedVectorsFormat()},
-          {
-            CuVSCodecs.acceleratedHNSWScalarQuantizedFormat(
-                new AcceleratedHNSWParams.Builder().build())
-          }
+          {CuVSCodecs.acceleratedHNSWBinaryQuantizedFormat()},
+          {CuVSCodecs.acceleratedHNSWScalarQuantizedFormat()}
         });
   }
 

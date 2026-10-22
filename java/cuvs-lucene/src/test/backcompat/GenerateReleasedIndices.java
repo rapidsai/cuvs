@@ -87,7 +87,7 @@ public class GenerateReleasedIndices {
               return perField;
             }
           };
-      write(codec, outDir, base.getName() + "-" + name + ".zip");
+      write(codec, outDir, name + ".zip");
     }
   }
 

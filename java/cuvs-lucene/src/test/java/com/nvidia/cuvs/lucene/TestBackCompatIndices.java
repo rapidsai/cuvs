@@ -25,6 +25,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
@@ -56,13 +57,13 @@ import org.apache.lucene.util.Version;
  * moves to a later Lucene release, cuvs-lucene release, or both.
  *
  * <p>The indexes are in {@code src/test/resources/backcompat}, one zip each, at {@code
- * releases/<cuvs-lucene version>/<lucene major.minor>/<codec name>[-<per-field format name>].zip}
- * if the jars of a released cuvs-lucene version wrote them, or at {@code snapshots/<lucene
- * major.minor>/<codec name>.zip} if a module of this repository did, for a Lucene release that no
- * released cuvs-lucene version supports yet. The path records the Lucene
- * release they were written on, the codec recorded in their segments, and the cuvs-lucene vectors
- * format used per field if the codec is Lucene's own. Each module reads the ones written on its own
- * Lucene release and all earlier ones. See the {@code README.md} next to them for how to add more.
+ * releases/<cuvs-lucene version>/<lucene major.minor>/<name>.zip} if the jars of a released
+ * cuvs-lucene version wrote them, or at {@code snapshots/<lucene major.minor>/<name>.zip} if a
+ * module of this repository did, for a Lucene release that no released cuvs-lucene version supports
+ * yet. The path records the Lucene release they were written on and either the cuvs-lucene codec
+ * recorded in their segments or, for an index written with Lucene's own codec, the cuvs-lucene
+ * vectors format its vector field uses. Each module reads the ones written on its own Lucene
+ * release and all earlier ones. See the {@code README.md} next to them for how to add more.
  *
  * <p>Reading and upgrading need no GPU, so those tests also run where cuVS is not available.
  */
@@ -73,7 +74,7 @@ public class TestBackCompatIndices extends LuceneTestCase {
   private static final String RESOURCE_DIR = "/backcompat";
   // The path of an index below RESOURCE_DIR; see the class javadoc.
   private static final Pattern INDEX_PATH =
-      Pattern.compile("(?:snapshots|releases/[\\d.]+)/(\\d+)\\.(\\d+)/(\\w+)(?:-(\\w+))?\\.zip");
+      Pattern.compile("(?:snapshots|releases/[\\d.]+)/(\\d+)\\.(\\d+)/(\\w+)\\.zip");
   private static final String ID_FIELD = "id";
   private static final String VECTOR_FIELD = "vector";
   private static final int NUM_DOCS = 200;
@@ -95,7 +96,14 @@ public class TestBackCompatIndices extends LuceneTestCase {
       Path indexDir = createTempDir(zip.getFileName().toString());
       unzip(zip, indexDir);
       try (Directory dir = newFSDirectory(indexDir)) {
-        checkIndex(dir, matcher.group(3), matcher.group(4), NUM_DOCS);
+        String name = matcher.group(3);
+        if (KnnVectorsFormat.availableKnnVectorsFormats().contains(name)) {
+          // Lucene's own codec with a cuvs-lucene format per field: check the field's format.
+          checkIndex(dir, null, name, NUM_DOCS);
+        } else {
+          // A cuvs-lucene codec: check the codec recorded in every segment.
+          checkIndex(dir, name, null, NUM_DOCS);
+        }
       } catch (AssertionError | Exception e) {
         throw new AssertionError("Failed to read " + matcher.group(), e);
       }
@@ -223,16 +231,18 @@ public class TestBackCompatIndices extends LuceneTestCase {
   }
 
   /**
-   * Checks that every segment was written by the expected codec (and, for Lucene's own codecs, that
-   * the vector field uses the expected cuvs-lucene format), and that searching for each indexed
-   * vector finds its own document.
+   * Checks that every segment was written by the expected codec, or that the vector field uses the
+   * expected cuvs-lucene format, and that searching for each indexed vector finds its own document.
    *
+   * @param codecName the codec recorded in every segment, or null to skip
    * @param perFieldFormat the vectors format name recorded for the vector field, or null to skip
    */
   private static void checkIndex(
       Directory dir, String codecName, String perFieldFormat, int numDocs) throws IOException {
-    for (SegmentCommitInfo info : SegmentInfos.readLatestCommit(dir)) {
-      assertEquals(codecName, info.info.getCodec().getName());
+    if (codecName != null) {
+      for (SegmentCommitInfo info : SegmentInfos.readLatestCommit(dir)) {
+        assertEquals(codecName, info.info.getCodec().getName());
+      }
     }
     try (DirectoryReader reader = DirectoryReader.open(dir)) {
       assertEquals(numDocs, reader.numDocs());

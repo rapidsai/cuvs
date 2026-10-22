@@ -79,6 +79,41 @@ the codec
 
 _Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:59`_
 
+### acceleratedHNSWFormat
+
+```java
+public static KnnVectorsFormat acceleratedHNSWFormat()
+```
+
+Returns the vectors format used by `#acceleratedHNSW()`, for use with a per-field codec.
+
+**Returns**
+
+the vectors format
+
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:69`_
+
+### acceleratedHNSWFormat
+
+```java
+public static KnnVectorsFormat acceleratedHNSWFormat(AcceleratedHNSWParams params)
+```
+
+Returns the vectors format used by `#acceleratedHNSW(AcceleratedHNSWParams)`, for use
+with a per-field codec.
+
+**Parameters**
+
+| Name | Description |
+| --- | --- |
+| `params` | the index build parameters |
+
+**Returns**
+
+the vectors format
+
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:80`_
+
 ### acceleratedHNSWScalarQuantized
 
 ```java
@@ -92,7 +127,7 @@ default parameters.
 
 the codec
 
-_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:70`_
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:91`_
 
 ### acceleratedHNSWScalarQuantized
 
@@ -112,7 +147,22 @@ Returns the codec that builds HNSW graphs on the GPU over scalar-quantized vecto
 
 the codec
 
-_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:80`_
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:101`_
+
+### acceleratedHNSWScalarQuantizedFormat
+
+```java
+public static KnnVectorsFormat acceleratedHNSWScalarQuantizedFormat()
+```
+
+Returns the vectors format used by `#acceleratedHNSWScalarQuantized()`, for use with a
+per-field codec.
+
+**Returns**
+
+the vectors format
+
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:112`_
 
 ### acceleratedHNSWScalarQuantizedFormat
 
@@ -132,7 +182,7 @@ Returns the vectors format used by `#acceleratedHNSWScalarQuantized(AcceleratedH
 
 the vectors format
 
-_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:92`_
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:123`_
 
 ### acceleratedHNSWBinaryQuantized
 
@@ -147,7 +197,7 @@ default parameters.
 
 the codec
 
-_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:104`_
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:135`_
 
 ### acceleratedHNSWBinaryQuantized
 
@@ -167,7 +217,42 @@ Returns the codec that builds HNSW graphs on the GPU over binary-quantized vecto
 
 the codec
 
-_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:114`_
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:145`_
+
+### acceleratedHNSWBinaryQuantizedFormat
+
+```java
+public static KnnVectorsFormat acceleratedHNSWBinaryQuantizedFormat()
+```
+
+Returns the vectors format used by `#acceleratedHNSWBinaryQuantized()`, for use with a
+per-field codec.
+
+**Returns**
+
+the vectors format
+
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:156`_
+
+### acceleratedHNSWBinaryQuantizedFormat
+
+```java
+public static KnnVectorsFormat acceleratedHNSWBinaryQuantizedFormat( AcceleratedHNSWParams params)
+```
+
+Returns the vectors format used by `#acceleratedHNSWBinaryQuantized(AcceleratedHNSWParams)`, for use with a per-field codec.
+
+**Parameters**
+
+| Name | Description |
+| --- | --- |
+| `params` | the index build parameters |
+
+**Returns**
+
+the vectors format
+
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:167`_
 
 ### gpuSearch
 
@@ -182,7 +267,7 @@ parameters.
 
 the codec
 
-_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:125`_
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:179`_
 
 ### gpuSearch
 
@@ -203,7 +288,7 @@ filter-bitset-cache configuration.
 
 the codec
 
-_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:136`_
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:190`_
 
 ### gpuSearch
 
@@ -224,6 +309,62 @@ Returns the codec that both builds and searches CAGRA indexes on the GPU.
 
 the codec
 
-_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:147`_
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:201`_
+
+### gpuSearchFormat
+
+```java
+public static KnnVectorsFormat gpuSearchFormat()
+```
+
+Returns the vectors format used by `#gpuSearch()`, for use with a per-field codec.
+
+**Returns**
+
+the vectors format
+
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:211`_
+
+### gpuSearchFormat
+
+```java
+public static KnnVectorsFormat gpuSearchFormat(GPUSearchParams params)
+```
+
+Returns the vectors format used by `#gpuSearch(GPUSearchParams)`, for use with a
+per-field codec.
+
+**Parameters**
+
+| Name | Description |
+| --- | --- |
+| `params` | the GPU index and search parameters |
+
+**Returns**
+
+the vectors format
+
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:222`_
+
+### gpuSearchFormat
+
+```java
+public static KnnVectorsFormat gpuSearchFormat( GPUSearchParams params, FilterBitsetCacheConfig filterCacheConfig)
+```
+
+Returns the vectors format used by FilterBitsetCacheConfig), for use with a per-field codec.
+
+**Parameters**
+
+| Name | Description |
+| --- | --- |
+| `params` | the GPU index and search parameters |
+| `filterCacheConfig` | the filter-bitset-cache configuration |
+
+**Returns**
+
+the vectors format
+
+_Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:234`_
 
 _Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:25`_

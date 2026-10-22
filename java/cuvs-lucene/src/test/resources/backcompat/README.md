@@ -5,13 +5,12 @@ Indexes read and upgraded by `TestBackCompatIndices`, one zip each. They all hol
 on all earlier ones. The directories record who wrote each index and on which Lucene release:
 
 ```
-releases/<cuvs-lucene version>/<lucene major.minor>/<codec>.zip   written by a published release
-releases/<cuvs-lucene version>/<lucene major.minor>/<codec>-<per-field format>.zip
-snapshots/<lucene major.minor>/<codec>.zip                         written by this repository
+releases/<cuvs-lucene version>/<lucene major.minor>/<name>.zip   written by a published release
+snapshots/<lucene major.minor>/<name>.zip                         written by this repository
 ```
 
-`<codec>` is the codec recorded in the index's segments. When that is Lucene's own codec, `<per-field format>`
-is the cuvs-lucene vectors format its vector field uses. `TestBackCompatIndices` fails on a zip placed
+`<name>` is the cuvs-lucene codec recorded in the index's segments or, for an index written with Lucene's own
+codec, the cuvs-lucene vectors format its vector field uses. `TestBackCompatIndices` fails on a zip placed
 anywhere else, so that it can't go unread.
 
 ## Written by released cuvs-lucene versions

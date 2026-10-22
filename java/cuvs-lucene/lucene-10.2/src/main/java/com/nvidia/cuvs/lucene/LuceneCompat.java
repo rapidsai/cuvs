@@ -42,6 +42,10 @@ final class LuceneCompat {
     return new Lucene101AcceleratedHNSWCodec(params);
   }
 
+  static KnnVectorsFormat acceleratedHNSWFormat(AcceleratedHNSWParams params) {
+    return new Lucene99AcceleratedHNSWVectorsFormat(params);
+  }
+
   static Codec acceleratedHNSWScalarQuantizedCodec(AcceleratedHNSWParams params) {
     return new LuceneAcceleratedHNSWScalarQuantizedCodec(params);
   }
@@ -54,7 +58,16 @@ final class LuceneCompat {
     return new LuceneAcceleratedHNSWBinaryQuantizedCodec(params);
   }
 
+  static KnnVectorsFormat acceleratedHNSWBinaryQuantizedFormat(AcceleratedHNSWParams params) {
+    return new LuceneAcceleratedHNSWBinaryQuantizedVectorsFormat(params);
+  }
+
   static Codec gpuSearchCodec(GPUSearchParams params, FilterBitsetCacheConfig filterCacheConfig) {
     return new CuVS2510GPUSearchCodec(params, filterCacheConfig);
+  }
+
+  static KnnVectorsFormat gpuSearchFormat(
+      GPUSearchParams params, FilterBitsetCacheConfig filterCacheConfig) {
+    return new CuVS2510GPUVectorsFormat(params, filterCacheConfig);
   }
 }
