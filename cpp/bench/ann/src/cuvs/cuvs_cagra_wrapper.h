@@ -70,7 +70,7 @@ inline void maybe_log_cagra_persistent_concurrency_hint(bool persistent_search)
 /** Whether the GPU can dereference this pointer: device, managed or mapped host memory. */
 inline auto is_device_accessible(const void* ptr) -> bool
 {
-  return raft::is_device_accessible(raft::memory_type_from_pointer(ptr));
+  return raft::get_pointer_memory_info(ptr).device_pointer != nullptr;
 }
 
 /**

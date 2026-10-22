@@ -59,9 +59,9 @@ struct pointer_residency_count<Type, Types...> {
   static inline auto run(const Type* ptr, const Types*... ptrs) -> std::tuple<int, int>
   {
     auto [on_device, on_host] = pointer_residency_count<Types...>::run(ptrs...);
-    auto mem_type             = raft::memory_type_from_pointer(ptr);
-    if (raft::is_device_accessible(mem_type)) { ++on_device; }
-    if (raft::is_host_accessible(mem_type)) { ++on_host; }
+    auto info                 = raft::get_pointer_memory_info(ptr);
+    if (info.device_pointer != nullptr) { ++on_device; }
+    if (raft::is_host_accessible(info.type)) { ++on_host; }
     return std::make_tuple(on_device, on_host);
   }
 };

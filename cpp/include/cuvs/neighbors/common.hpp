@@ -1106,21 +1106,12 @@ template <typename ValueT, typename SrcT>
 [[nodiscard]] inline ValueT* expect_device_accessible_data_handle(SrcT const& src,
                                                                   char const* error_msg)
 {
-  // Device and managed allocations are accepted on their own merit (an allocation owned by another
-  // device is perfectly usable once the caller switches to it, as the multi-GPU paths do). Host
-  // memory is only accepted when mapped for the device (pinned) or when the device reads pageable
-  // memory through the host page tables (ATS). HMM pageable memory is not device accessible.
-  auto mem_type = raft::memory_type_from_pointer(src.data_handle());
-  RAFT_EXPECTS(raft::is_device_accessible(mem_type), "%s", error_msg);
-  if (mem_type == raft::memory_type::pinned) {
-    // Pinned (cudaMallocHost / cudaHostRegister) memory is reached through its device mapping.
-    cudaPointerAttributes ptr_attrs;
-    RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, src.data_handle()));
-    auto* device_ptr = reinterpret_cast<ValueT*>(ptr_attrs.devicePointer);
-    RAFT_EXPECTS(device_ptr != nullptr, "%s", error_msg);
-    return device_ptr;
-  }
-  return const_cast<ValueT*>(src.data_handle());
+  // Device and managed allocations (including those owned by another device, which the multi-GPU
+  // paths use once the owning device is current), pinned host memory (through its device mapping)
+  // and pageable memory on ATS systems are device accessible. HMM pageable memory is not.
+  auto* device_ptr = raft::get_pointer_memory_info(src.data_handle()).device_pointer;
+  RAFT_EXPECTS(device_ptr != nullptr, "%s", error_msg);
+  return const_cast<ValueT*>(device_ptr);
 }
 
 template <typename ValueT, typename IndexT, typename ViewT, typename SrcT>

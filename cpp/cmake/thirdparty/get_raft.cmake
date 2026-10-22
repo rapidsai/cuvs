@@ -9,7 +9,7 @@ set(RAFT_VERSION "${RAPIDS_VERSION_MAJOR_MINOR}")
 # TODO: Temporarily use https://github.com/NVIDIA/raft/pull/3186 (memory_type_from_pointer fix for
 # pinned, HMM and ATS memory). Restore to NVIDIA / ${rapids-cmake-checkout-tag} once it has merged.
 set(RAFT_FORK "robertmaynard")
-set(RAFT_PINNED_TAG "7cbe14178a5b7bc9ca901df0fab7af38d57069cc")
+set(RAFT_PINNED_TAG "5515777c7b2590006e2f9bf375efb586f26ba78b")
 set(LIBRAFT_LOGGING_LEVEL "INFO"
     CACHE STRING "Choose the RAFT logging level compiled into cuVS."
 )

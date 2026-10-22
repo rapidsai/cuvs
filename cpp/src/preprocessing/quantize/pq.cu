@@ -87,9 +87,8 @@ auto train_from_rows(raft::resources const& res,
                      int64_t dim,
                      int64_t stride) -> cuvs::neighbors::device_vpq_dataset<half, int64_t>
 {
-  // Pageable memory on HMM systems may report a device pointer but is not device accessible.
-  auto const* device_ptr =
-    raft::is_device_accessible(raft::memory_type_from_pointer(src_ptr)) ? src_ptr : nullptr;
+  // Null for pageable memory on HMM systems, which is not device accessible.
+  auto const* device_ptr = raft::get_pointer_memory_info(src_ptr).device_pointer;
   if (device_ptr == nullptr) {
     // A host mdspan makes training subsample the rows and encoding stream them in bounded batches,
     // so the dense dataset is never staged on the device.
