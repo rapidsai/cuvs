@@ -1414,7 +1414,6 @@ if(NOT BUILD_CPU_ONLY)
   add_library(
     cuvs_objs OBJECT
     src/core/reductions.cu
-    src/core/reductions.cu
     src/cluster/detail/minClusterDistanceCompute.cu
     src/cluster/agglomerative.cu
     src/cluster/gmm_double.cu
@@ -1635,12 +1634,6 @@ if(NOT BUILD_CPU_ONLY)
 
   set(CUVS_CTK_MATH_DEPENDENCIES ${CUVS_CUBLAS_DEPENDENCY} ${CUVS_CUSOLVER_DEPENDENCY}
                                  ${CUVS_CUSPARSE_DEPENDENCY} ${CUVS_CURAND_DEPENDENCY}
-  )
-
-  # Declare shared reduction host instantiations before nested RAFT calls.
-  target_compile_options(
-    cuvs_objs PRIVATE
-    "$<$<COMPILE_LANGUAGE:CUDA>:--pre-include=${CMAKE_CURRENT_SOURCE_DIR}/src/core/reduction_ownership.hpp>"
   )
 
   # Declare shared reduction host instantiations before nested RAFT calls.

@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <cuvs/core/cuda_fp16.hpp>
+
 #include <raft/core/kvp.hpp>
 #include <raft/linalg/detail/coalesced_reduction.cuh>
 #include <raft/linalg/detail/norm.cuh>
