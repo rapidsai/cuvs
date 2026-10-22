@@ -178,13 +178,12 @@ static void merge_indices_for_layout(
     auto const final_row_count =
       cuvs::neighbors::cagra::detail::merged_dataset_size<T, uint32_t, DatasetViewT>(
         *res_ptr, index_ptrs, row_filter);
-    auto const dim    = static_cast<uint32_t>(index_ptrs.front()->dim());
-    auto const stride = static_cast<int64_t>(index_ptrs.front()->dataset().data_const_view().stride(0));
+    auto const dim = static_cast<uint32_t>(index_ptrs.front()->dim());
 
     try {
       using owner_t = cuvs::neighbors::owning_dataset_for_view_t<DatasetViewT>;
       auto owner    = std::make_unique<owner_t>(
-        cuvs::neighbors::detail::make_dense_array<owner_t>(*res_ptr, final_row_count, dim, stride));
+        cuvs::neighbors::detail::make_dense_array<owner_t>(*res_ptr, final_row_count, dim));
       auto view     = std::as_const(*owner).view();
       auto merged_idx =
         cuvs::neighbors::cagra::merge(
@@ -219,7 +218,8 @@ static void merge_indices_for_layout(
     using host_owner_t = cuvs::neighbors::owning_dataset_for_view_t<host_view_t>;
 
     auto matrix = cuvs::neighbors::detail::make_dense_array<host_owner_t>(
-      *res_ptr, final_row_count, dim, stride);
+      *res_ptr, final_row_count, dim);
+    auto const stride = static_cast<int64_t>(matrix.mapping().stride(0));
     std::fill_n(matrix.data_handle(), matrix.mapping().required_span_size(), T{});
 
     std::size_t row_offset = 0;

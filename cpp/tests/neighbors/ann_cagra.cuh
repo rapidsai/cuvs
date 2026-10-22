@@ -1329,8 +1329,7 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
         auto merged_dataset = padded_t(cuvs::neighbors::detail::make_dense_array<padded_t>(
           handle_,
           ps.n_rows - static_cast<int64_t>(test_cagra_sample_filter::offset),
-          static_cast<uint32_t>(ps.dim),
-          static_cast<uint32_t>(index0.dataset().data_const_view().stride(0))));
+          static_cast<uint32_t>(ps.dim)));
         auto merge_idx      = cuvs::neighbors::cagra::merge(
           handle_, index_params, indices, std::as_const(merged_dataset).view(), bitset_filter_obj);
 
@@ -1575,10 +1574,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
             static_cast<int64_t>(index0.size()) + static_cast<int64_t>(index1.size());
           using padded_t      = cuvs::neighbors::device_padded_dataset<DataT, int64_t>;
           auto merged_dataset = padded_t(cuvs::neighbors::detail::make_dense_array<padded_t>(
-            handle_,
-            merged_rows,
-            static_cast<uint32_t>(ps.dim),
-            static_cast<uint32_t>(index0.dataset().data_const_view().stride(0))));
+            handle_, merged_rows, static_cast<uint32_t>(ps.dim)));
           auto merged_idx =
             ps.physical_merge_params.has_value()
               ? cagra::merge(handle_,

@@ -35,9 +35,9 @@ void distribute_padded_dataset(
     const T* rank_ptr   = padded_host.data_handle() + rank_offset * stride;
     auto rank_host_mds =
       raft::make_host_matrix_view<const T, int64_t, raft::row_major>(rank_ptr, rank_rows, stride);
-    using padded_t          = cuvs::neighbors::device_padded_dataset<T, int64_t>;
-    auto rank_device_matrix = cuvs::neighbors::detail::make_dense_array<padded_t>(
-      dev_res, rank_rows, padded_dataset.dim(), static_cast<uint32_t>(stride));
+    using padded_t = cuvs::neighbors::device_padded_dataset<T, int64_t>;
+    auto rank_device_matrix =
+      cuvs::neighbors::detail::make_dense_array<padded_t>(dev_res, rank_rows, padded_dataset.dim());
     raft::copy(dev_res,
                raft::make_device_matrix_view<T, int64_t>(
                  rank_device_matrix.data_handle(), rank_rows, stride),

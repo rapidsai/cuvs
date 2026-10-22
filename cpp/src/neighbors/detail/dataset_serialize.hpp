@@ -241,6 +241,25 @@ auto deserialize_dense_payload_metadata(raft::resources const& res, std::istream
   return {n_rows, dim, stride, elements};
 }
 
+/**
+ * The payload metadata as seen by the dataset that is being restored. The payload on the wire is
+ * always tight `[n_rows x dim]`; the recorded stride only says how the saved dataset laid its rows
+ * out, which the restored dataset does not have to share (a padded file may be loaded as a
+ * contiguous dataset and vice versa). The restored dataset takes the stride its own layout
+ * dictates: the rows stay packed for a contiguous dataset, and the padding is restored for a padded
+ * one.
+ */
+template <typename OwningDatasetT, typename DataT, typename IdxT>
+auto deserialize_dense_payload_metadata_for(raft::resources const& res, std::istream& is)
+  -> dense_payload_metadata<IdxT>
+{
+  auto metadata      = deserialize_dense_payload_metadata<DataT, IdxT>(res, is);
+  using mapping_type = typename OwningDatasetT::data_type::mapping_type;
+  metadata.stride    = static_cast<uint32_t>(
+    make_dense_mapping<mapping_type>(metadata.n_rows, metadata.dim).stride(0));
+  return metadata;
+}
+
 template <typename DataT, typename IdxT>
 void skip_dense_payload(raft::resources const& res, std::istream& is)
 {
@@ -280,24 +299,27 @@ void skip_dense_payload(raft::resources const& res, std::istream& is)
   }
 }
 
-/** Allocate the storage for the payload; the wire stride must be the one the layout dictates. */
+/**
+ * Allocate the storage for the payload. The row stride is the one the layout dictates, which is
+ * what `deserialize_dense_payload_metadata_for` records in the metadata.
+ *
+ * The storage owns exactly `required_span_size()` elements, which is the only memory we may write.
+ * Both dense layouts include the padding of every row in their span (a contiguous dataset has no
+ * padding), so zeroing the padding of all rows after this call stays inside the allocation.
+ */
 template <typename OwningDatasetT, typename MetadataT>
 auto make_dense_storage(raft::resources const& res, MetadataT const& metadata)
 {
-  auto storage =
-    make_dense_array<OwningDatasetT>(res, metadata.n_rows, metadata.dim, metadata.stride);
-  RAFT_EXPECTS(static_cast<uint32_t>(storage.mapping().stride(0)) == metadata.stride,
-               "deserialize_dense_payload: row stride (%u) does not match the dataset layout",
-               static_cast<unsigned>(metadata.stride));
-  return storage;
+  return make_dense_array<OwningDatasetT>(res, metadata.n_rows, metadata.dim);
 }
 
 template <typename DataT, typename IdxT, typename OwningDatasetT>
 auto deserialize_device_dense(raft::resources const& res, std::istream& is)
   -> std::unique_ptr<OwningDatasetT>
 {
-  auto const metadata = deserialize_dense_payload_metadata<DataT, IdxT>(res, is);
-  auto staging        = raft::make_host_matrix<DataT, IdxT>(metadata.n_rows, metadata.dim);
+  auto const metadata =
+    deserialize_dense_payload_metadata_for<OwningDatasetT, DataT, IdxT>(res, is);
+  auto staging = raft::make_host_matrix<DataT, IdxT>(metadata.n_rows, metadata.dim);
   read_dense_bytes(is, staging.data_handle(), metadata.elements);
 
   auto storage     = make_dense_storage<OwningDatasetT>(res, metadata);
@@ -330,9 +352,10 @@ template <typename DataT, typename IdxT, typename OwningDatasetT>
 auto deserialize_device_dense(raft::resources const& res, cuvs::util::kvikio_file_reader& reader)
   -> std::unique_ptr<OwningDatasetT>
 {
-  auto const metadata = deserialize_dense_payload_metadata<DataT, IdxT>(res, reader.stream());
-  auto storage        = make_dense_storage<OwningDatasetT>(res, metadata);
-  auto const stream   = raft::resource::get_cuda_stream(res);
+  auto const metadata =
+    deserialize_dense_payload_metadata_for<OwningDatasetT, DataT, IdxT>(res, reader.stream());
+  auto storage      = make_dense_storage<OwningDatasetT>(res, metadata);
+  auto const stream = raft::resource::get_cuda_stream(res);
 
   if (metadata.stride > metadata.dim && metadata.n_rows > 0) {
     RAFT_CUDA_TRY(cudaMemset2DAsync(storage.data_handle() + metadata.dim,
@@ -408,8 +431,9 @@ template <typename DataT, typename IdxT, typename OwningDatasetT>
 auto deserialize_host_dense(raft::resources const& res, std::istream& is)
   -> std::unique_ptr<OwningDatasetT>
 {
-  auto const metadata = deserialize_dense_payload_metadata<DataT, IdxT>(res, is);
-  auto storage        = make_dense_storage<OwningDatasetT>(res, metadata);
+  auto const metadata =
+    deserialize_dense_payload_metadata_for<OwningDatasetT, DataT, IdxT>(res, is);
+  auto storage = make_dense_storage<OwningDatasetT>(res, metadata);
   if (metadata.stride == metadata.dim) {
     read_dense_bytes(is, storage.data_handle(), metadata.elements);
   } else {

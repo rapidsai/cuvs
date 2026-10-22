@@ -299,17 +299,12 @@ using host_empty_dataset_view =
 using cuvs::device_padded_dataset;
 using cuvs::host_padded_dataset;
 
-/* The `standard` dataset: row-major rows of any stride (at least the dimension), no alignment. */
+/* The `standard` dataset: densely packed row-major rows (the row stride equals the dimension), no
+ * alignment. It is the contiguous dataset; use the padded dataset for rows that have padding. */
 template <typename T, typename IdxT>
-using device_standard_dataset = cuvs::dataset<
-  T,
-  IdxT,
-  cuvs::mdarray_spec<raft::layout_stride, raft::device_accessor<raft::device_container_policy<T>>>>;
+using device_standard_dataset = cuvs::device_contiguous_dataset<T, IdxT>;
 template <typename T, typename IdxT>
-using host_standard_dataset = cuvs::dataset<
-  T,
-  IdxT,
-  cuvs::mdarray_spec<raft::layout_stride, raft::host_accessor<raft::host_container_policy<T>>>>;
+using host_standard_dataset = cuvs::host_contiguous_dataset<T, IdxT>;
 
 /* The former spelling carried the math type as an optional third argument. */
 template <typename T, typename IdxT, typename MathT = T>
@@ -397,7 +392,7 @@ template <template <typename, typename, typename> class DatasetT,
           typename IdxT,
           typename ContainerPolicy>
 struct dataset_view_kind_of<
-  DatasetT<DataT, IdxT, mdarray_spec<raft::layout_stride, ContainerPolicy>>> {
+  DatasetT<DataT, IdxT, mdarray_spec<raft::layout_c_contiguous, ContainerPolicy>>> {
   static constexpr dataset_view_kind value = dataset_view_kind::standard;
 };
 
@@ -628,17 +623,15 @@ template <typename SrcT>
                            : static_cast<uint32_t>(src.extent(1));
 }
 
-/** The mapping of `rows x dim` elements whose rows are `stride` elements apart. */
+/**
+ * The mapping of `rows x dim` elements. The dense layouts (contiguous and padded) derive the row
+ * stride from the dimension alone; callers that need it read it from the mapping (or from the
+ * array allocated with it) and compare it with the stride they expect, if any.
+ */
 template <typename MappingT>
-[[nodiscard]] inline auto make_dense_mapping(int64_t rows, uint32_t dim, uint32_t stride)
-  -> MappingT
+[[nodiscard]] inline auto make_dense_mapping(int64_t rows, uint32_t dim) -> MappingT
 {
-  auto extents = raft::make_extents<int64_t>(rows, dim);
-  if constexpr (std::is_same_v<typename MappingT::layout_type, raft::layout_stride>) {
-    return MappingT{extents, cuda::std::array<int64_t, 2>{stride, 1}};
-  } else {
-    return MappingT{extents};  // a padded layout derives the stride from the dimension
-  }
+  return MappingT{raft::make_extents<int64_t>(rows, dim)};
 }
 
 template <typename ViewT>
@@ -648,9 +641,10 @@ template <typename ViewT>
                                           uint32_t stride) -> ViewT
 {
   using data_view_type = typename ViewT::data_view_type;
-  auto mapping = make_dense_mapping<typename data_view_type::mapping_type>(rows, dim, stride);
+  auto mapping         = make_dense_mapping<typename data_view_type::mapping_type>(rows, dim);
   RAFT_EXPECTS(rows == 0 || static_cast<uint32_t>(mapping.stride(0)) == stride,
-               "make_dense_view: the row stride %u does not match the stride %u of the layout",
+               "make_dense_view: the row stride %u does not match the stride %u of the layout "
+               "(a contiguous dataset has no padding; use a padded dataset for padded rows)",
                stride,
                static_cast<uint32_t>(mapping.stride(0)));
   return ViewT{data_view_type{ptr, mapping}};
@@ -661,6 +655,10 @@ template <typename ViewT>
 /**
  * The rows of a dense dataset (or its view) as a plain row-major matrix, as wide as the row stride:
  * `extent(1)` spans the padding too, unlike `data_const_view()`, which spans the logical dimension.
+ *
+ * The result has `rows * stride` elements. That is within `required_span_size()` of the storage,
+ * the only amount of memory a mapping owns: both dense layouts (contiguous and padded) include the
+ * padding of every row, including the last one, in their span.
  */
 template <typename DatasetT>
 [[nodiscard]] inline auto dense_row_major_view(DatasetT const& dataset)
@@ -689,15 +687,12 @@ template <typename ViewT>
 }
 
 template <typename DatasetT>
-[[nodiscard]] inline auto make_dense_array(raft::resources const& res,
-                                           int64_t rows,
-                                           uint32_t dim,
-                                           uint32_t stride) -> typename DatasetT::data_type
+[[nodiscard]] inline auto make_dense_array(raft::resources const& res, int64_t rows, uint32_t dim)
+  -> typename DatasetT::data_type
 {
   using data_type = typename DatasetT::data_type;
-  return data_type{res,
-                   make_dense_mapping<typename data_type::mapping_type>(rows, dim, stride),
-                   typename data_type::container_policy_type{}};
+  auto mapping    = make_dense_mapping<typename data_type::mapping_type>(rows, dim);
+  return data_type{res, mapping, typename data_type::container_policy_type{}};
 }
 
 template <typename ValueT, typename SrcT>
@@ -764,7 +759,14 @@ auto make_device_dense_row_major_dataset_from_src(raft::resources const& res,
                  "Use %s() to get a view instead.",
                  view_factory_name);
   }
-  auto out_array = make_dense_array<DatasetT>(res, src.extent(0), logical_dim, target_stride);
+  auto out_array = make_dense_array<DatasetT>(res, src.extent(0), logical_dim);
+  // The copy below writes `target_stride` columns per row: that has to be the stride of the layout,
+  // or the rows would not fit in `required_span_size()`.
+  RAFT_EXPECTS(
+    src.extent(0) == 0 || static_cast<uint32_t>(out_array.mapping().stride(0)) == target_stride,
+    "the row stride %u does not match the stride %u of the dataset layout",
+    target_stride,
+    static_cast<uint32_t>(out_array.mapping().stride(0)));
   RAFT_CUDA_TRY(cudaMemsetAsync(out_array.data_handle(),
                                 0,
                                 out_array.mapping().required_span_size() * sizeof(ValueT),
@@ -800,7 +802,14 @@ auto make_host_dense_row_major_dataset_from_src(raft::resources const& res,
   }
   RAFT_EXPECTS(static_cast<uint32_t>(src.extent(1)) <= target_stride,
                "Source row length must not exceed required stride.");
-  auto out_array = make_dense_array<DatasetT>(res, src.extent(0), logical_dim, target_stride);
+  auto out_array = make_dense_array<DatasetT>(res, src.extent(0), logical_dim);
+  // The copy below writes `target_stride` columns per row: that has to be the stride of the layout,
+  // or the rows would not fit in `required_span_size()`.
+  RAFT_EXPECTS(
+    src.extent(0) == 0 || static_cast<uint32_t>(out_array.mapping().stride(0)) == target_stride,
+    "the row stride %u does not match the stride %u of the dataset layout",
+    target_stride,
+    static_cast<uint32_t>(out_array.mapping().stride(0)));
   std::memset(
     out_array.data_handle(), 0, out_array.mapping().required_span_size() * sizeof(ValueT));
   raft::copy_matrix(out_array.data_handle(),
@@ -882,6 +891,10 @@ auto make_device_standard_dataset_view(SrcT const& src)
 {
   using value_type = typename SrcT::value_type;
   using index_type = typename SrcT::index_type;
+  RAFT_EXPECTS(detail::mdspan_row_stride_elements(src) == static_cast<uint32_t>(src.extent(1)),
+               "make_device_standard_dataset_view: the rows must be densely packed (stride equals "
+               "the dimension). Use make_device_padded_dataset_view() or "
+               "make_device_padded_dataset() for rows with padding.");
   return detail::make_device_dense_row_major_view_from_src<
     value_type,
     device_standard_dataset_view<value_type, index_type>>(src,
@@ -889,31 +902,21 @@ auto make_device_standard_dataset_view(SrcT const& src)
 }
 
 /**
- * @brief Create an owning device standard dataset with explicit row layout.
+ * @brief Create an owning device standard (densely packed) dataset as a copy of the source rows.
  *
- * Internal use only: the sole call site today is
- * `cuvs::neighbors::detail::deserialize_standard()` in `dataset_serialize.hpp`, which must pass
- * wire-format `(logical_dim, stride)` because the deserialized host buffer is tight `[n_rows x
- * dim]` while the on-disk stride may be larger. Do not call from user code; prefer
- * `make_device_standard_dataset_view()` when wrapping existing correctly-strided storage.
- *
- * Potential future call sites if an owning copy with explicit stride is needed:
- * - C API dataset upload (mirroring `make_device_padded_dataset` in `c/src/neighbors/cagra.cpp`)
- * - `tiered_index` / composite index paths that materialize standard-layout device storage
- * - Multigpu (MG) index build or merge when rehydrating a strided dataset from host fragments
+ * Prefer `make_device_standard_dataset_view()` when the source is already densely packed device
+ * memory; this function throws in that case.
  */
 template <typename SrcT>
-auto make_device_standard_dataset(const raft::resources& res,
-                                  SrcT const& src,
-                                  uint32_t logical_dim,
-                                  uint32_t target_stride)
+auto make_device_standard_dataset(const raft::resources& res, SrcT const& src)
   -> std::unique_ptr<device_standard_dataset<typename SrcT::value_type, typename SrcT::index_type>>
 {
-  using value_type = typename SrcT::value_type;
-  using index_type = typename SrcT::index_type;
+  using value_type           = typename SrcT::value_type;
+  using index_type           = typename SrcT::index_type;
+  uint32_t const logical_dim = static_cast<uint32_t>(src.extent(1));
   return detail::make_device_dense_row_major_dataset_from_src<
     device_standard_dataset<value_type, index_type>,
-    value_type>(res, src, logical_dim, target_stride, "make_device_standard_dataset_view");
+    value_type>(res, src, logical_dim, logical_dim, "make_device_standard_dataset_view");
 }
 
 template <typename SrcT>
@@ -922,6 +925,10 @@ auto make_host_standard_dataset_view(SrcT const& src)
 {
   using value_type = typename SrcT::value_type;
   using index_type = typename SrcT::index_type;
+  RAFT_EXPECTS(detail::mdspan_row_stride_elements(src) == static_cast<uint32_t>(src.extent(1)),
+               "make_host_standard_dataset_view: the rows must be densely packed (stride equals "
+               "the dimension). Use make_host_padded_dataset_view() or "
+               "make_host_padded_dataset() for rows with padding.");
   return detail::make_host_dense_row_major_view_from_src<
     value_type,
     host_standard_dataset_view<value_type, index_type>>(src, static_cast<uint32_t>(src.extent(1)));

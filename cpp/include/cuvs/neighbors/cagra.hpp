@@ -3614,21 +3614,77 @@ auto build(const raft::resources& clique,
            cuvs::neighbors::host_standard_dataset_view<uint8_t, int64_t> const& index_dataset)
   -> cuvs::neighbors::mg_index<cagra::device_standard_index<uint8_t, uint32_t>, uint8_t, uint32_t>;
 
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index from a padded host dataset (`float`).
+ *
+ * The index takes the padded row width (the row stride of `index_dataset`) as its dimension, so
+ * the search queries must be this wide. The padding is zero and does not change the L2, inner
+ * product and cosine distances, so zero-pad the queries to the index dimension.
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a padded row-major matrix on host [n_rows, row stride]
+ *
+ * @return the constructed CAGRA MG index
+ */
 auto build(const raft::resources& clique,
            const cuvs::neighbors::mg_index_params<cagra::index_params>& index_params,
            cuvs::neighbors::host_padded_dataset_view<float, int64_t> const& index_dataset)
   -> cuvs::neighbors::mg_index<cagra::device_padded_index<float, uint32_t>, float, uint32_t>;
 
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index from a padded host dataset (`half`).
+ *
+ * The index takes the padded row width (the row stride of `index_dataset`) as its dimension, so
+ * the search queries must be this wide. The padding is zero and does not change the L2, inner
+ * product and cosine distances, so zero-pad the queries to the index dimension.
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a padded row-major matrix on host [n_rows, row stride]
+ *
+ * @return the constructed CAGRA MG index
+ */
 auto build(const raft::resources& clique,
            const cuvs::neighbors::mg_index_params<cagra::index_params>& index_params,
            cuvs::neighbors::host_padded_dataset_view<half, int64_t> const& index_dataset)
   -> cuvs::neighbors::mg_index<cagra::device_padded_index<half, uint32_t>, half, uint32_t>;
 
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index from a padded host dataset (`int8_t`).
+ *
+ * The index takes the padded row width (the row stride of `index_dataset`) as its dimension, so
+ * the search queries must be this wide. The padding is zero and does not change the L2, inner
+ * product and cosine distances, so zero-pad the queries to the index dimension.
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a padded row-major matrix on host [n_rows, row stride]
+ *
+ * @return the constructed CAGRA MG index
+ */
 auto build(const raft::resources& clique,
            const cuvs::neighbors::mg_index_params<cagra::index_params>& index_params,
            cuvs::neighbors::host_padded_dataset_view<int8_t, int64_t> const& index_dataset)
   -> cuvs::neighbors::mg_index<cagra::device_padded_index<int8_t, uint32_t>, int8_t, uint32_t>;
 
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index from a padded host dataset (`uint8_t`).
+ *
+ * The index takes the padded row width (the row stride of `index_dataset`) as its dimension, so
+ * the search queries must be this wide. The padding is zero and does not change the L2, inner
+ * product and cosine distances, so zero-pad the queries to the index dimension.
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a padded row-major matrix on host [n_rows, row stride]
+ *
+ * @return the constructed CAGRA MG index
+ */
 auto build(const raft::resources& clique,
            const cuvs::neighbors::mg_index_params<cagra::index_params>& index_params,
            cuvs::neighbors::host_padded_dataset_view<uint8_t, int64_t> const& index_dataset)
