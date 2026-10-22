@@ -7,6 +7,7 @@
 
 #include <cuvs/preprocessing/quantize/pq.hpp>
 
+#include <raft/core/memory_type.hpp>
 #include <raft/matrix/copy.cuh>
 #include <raft/util/cudart_utils.hpp>
 
@@ -86,9 +87,9 @@ auto train_from_rows(raft::resources const& res,
                      int64_t dim,
                      int64_t stride) -> cuvs::neighbors::device_vpq_dataset<half, int64_t>
 {
-  cudaPointerAttributes ptr_attrs;
-  RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, src_ptr));
-  auto const* device_ptr = reinterpret_cast<T const*>(ptr_attrs.devicePointer);
+  // Pageable memory on HMM systems may report a device pointer but is not device accessible.
+  auto const* device_ptr =
+    raft::is_device_accessible(raft::memory_type_from_pointer(src_ptr)) ? src_ptr : nullptr;
   if (device_ptr == nullptr) {
     // A host mdspan makes training subsample the rows and encoding stream them in bounded batches,
     // so the dense dataset is never staged on the device.

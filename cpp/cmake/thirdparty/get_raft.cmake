@@ -6,8 +6,10 @@
 
 # Use RAPIDS_VERSION_MAJOR_MINOR from rapids_config.cmake
 set(RAFT_VERSION "${RAPIDS_VERSION_MAJOR_MINOR}")
-set(RAFT_FORK "NVIDIA")
-set(RAFT_PINNED_TAG "${rapids-cmake-checkout-tag}")
+# TODO: Temporarily use https://github.com/NVIDIA/raft/pull/3186 (memory_type_from_pointer fix for
+# pinned, HMM and ATS memory). Restore to NVIDIA / ${rapids-cmake-checkout-tag} once it has merged.
+set(RAFT_FORK "robertmaynard")
+set(RAFT_PINNED_TAG "7cbe14178a5b7bc9ca901df0fab7af38d57069cc")
 set(LIBRAFT_LOGGING_LEVEL "INFO"
     CACHE STRING "Choose the RAFT logging level compiled into cuVS."
 )
