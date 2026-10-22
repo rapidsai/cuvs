@@ -53,3 +53,23 @@ template void count_labels<unsigned long long, int64_t>(
   const uint32_t*, unsigned long long*, int64_t, int64_t, rmm::device_uvector<char>&, cudaStream_t);
 
 }  // namespace cuvs::detail
+
+namespace cuvs::detail {
+template <typename SampleIt, typename CounterT, typename LevelT, typename NumItems>
+cudaError_t histogram_even(void* storage,
+                           size_t& bytes,
+                           SampleIt samples,
+                           CounterT* counts,
+                           int levels,
+                           LevelT lower,
+                           LevelT upper,
+                           NumItems count,
+                           cudaStream_t stream)
+{
+  return cub::DeviceHistogram::HistogramEven(
+    storage, bytes, samples, counts, levels, lower, upper, count, stream);
+}
+
+// EXPLICIT_HOST_INSTANTIATIONS
+
+}  // namespace cuvs::detail

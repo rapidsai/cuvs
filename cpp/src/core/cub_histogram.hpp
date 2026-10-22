@@ -21,3 +21,16 @@ void count_labels(const uint32_t* labels,
                   cudaStream_t stream);
 
 }  // namespace cuvs::detail
+
+namespace cuvs::detail {
+template <typename SampleIt, typename CounterT, typename LevelT, typename NumItems>
+cudaError_t histogram_even(void* storage,
+                           size_t& bytes,
+                           SampleIt samples,
+                           CounterT* counts,
+                           int levels,
+                           LevelT lower,
+                           LevelT upper,
+                           NumItems count,
+                           cudaStream_t stream);
+}  // namespace cuvs::detail

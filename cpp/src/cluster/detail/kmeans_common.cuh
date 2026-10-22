@@ -165,27 +165,27 @@ void countLabels(raft::resources const& handle,
     CubIndexT upper_level = n_clusters;
 
     size_t temp_storage_bytes = 0;
-    RAFT_CUDA_TRY(cub::DeviceHistogram::HistogramEven(nullptr,
-                                                      temp_storage_bytes,
-                                                      labels,
-                                                      count,
-                                                      num_levels,
-                                                      lower_level,
-                                                      upper_level,
-                                                      static_cast<CubIndexT>(n_samples),
-                                                      stream));
+    RAFT_CUDA_TRY(cuvs::detail::histogram_even(nullptr,
+                                               temp_storage_bytes,
+                                               labels,
+                                               count,
+                                               num_levels,
+                                               lower_level,
+                                               upper_level,
+                                               static_cast<CubIndexT>(n_samples),
+                                               stream));
 
     workspace.resize(temp_storage_bytes, stream);
 
-    RAFT_CUDA_TRY(cub::DeviceHistogram::HistogramEven(workspace.data(),
-                                                      temp_storage_bytes,
-                                                      labels,
-                                                      count,
-                                                      num_levels,
-                                                      lower_level,
-                                                      upper_level,
-                                                      static_cast<CubIndexT>(n_samples),
-                                                      stream));
+    RAFT_CUDA_TRY(cuvs::detail::histogram_even(workspace.data(),
+                                               temp_storage_bytes,
+                                               labels,
+                                               count,
+                                               num_levels,
+                                               lower_level,
+                                               upper_level,
+                                               static_cast<CubIndexT>(n_samples),
+                                               stream));
   }
 }
 
