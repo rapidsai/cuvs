@@ -25,6 +25,11 @@ if(CUVS_EXPERIMENT_DEDUP_KERNELS)
       list(APPEND _dedup_retained "${_dedup_source}")
     endif()
   endforeach()
+  # The shared ball-cover host launchers instantiate both passes, including all 16 kernels emitted
+  # by these explicit-instantiation-only files.
+  list(REMOVE_ITEM _dedup_retained src/neighbors/ball_cover/detail/ball_cover/registers_pass_one.cu
+       src/neighbors/ball_cover/detail/ball_cover/registers_pass_two.cu
+  )
   set_property(TARGET cuvs_objs PROPERTY SOURCES "${_dedup_retained};${_dedup_copies}")
   target_sources(cuvs_objs PRIVATE src/detail/kernel_dedup_abi.cpp)
   set_target_properties(cuvs_objs PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE GROUP)
