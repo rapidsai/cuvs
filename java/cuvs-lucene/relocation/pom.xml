@@ -96,6 +96,12 @@ SPDX-License-Identifier: Apache-2.0
         </configuration>
       </plugin>
       <plugin>
+        <!-- Pinned like in the parent pom, which this standalone pom doesn't inherit from. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>3.1.4</version>
+      </plugin>
+      <plugin>
         <!--
             Copies this pom into target/, like the other modules' flattened poms, so that the CI artifact
             holds everything needed to publish it.
