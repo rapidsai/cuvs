@@ -1413,6 +1413,7 @@ if(NOT BUILD_CPU_ONLY)
 
   add_library(
     cuvs_objs OBJECT
+    src/core/selection.cu
     src/cluster/detail/minClusterDistanceCompute.cu
     src/cluster/agglomerative.cu
     src/cluster/gmm_double.cu
@@ -1633,6 +1634,12 @@ if(NOT BUILD_CPU_ONLY)
 
   set(CUVS_CTK_MATH_DEPENDENCIES ${CUVS_CUBLAS_DEPENDENCY} ${CUVS_CUSOLVER_DEPENDENCY}
                                  ${CUVS_CUSPARSE_DEPENDENCY} ${CUVS_CURAND_DEPENDENCY}
+  )
+
+  # Declare shared selection launchers before nested dependency instantiation.
+  target_compile_options(
+    cuvs_objs PRIVATE
+    "$<$<COMPILE_LANGUAGE:CUDA>:--pre-include=${CMAKE_CURRENT_SOURCE_DIR}/src/core/selection_ownership.hpp>"
   )
 
   if(NOT cuvs_compile_mode STREQUAL "static_only")
