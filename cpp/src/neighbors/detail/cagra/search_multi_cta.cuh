@@ -216,71 +216,7 @@ struct search
     const INDEX_T* dev_seed_ptr,              // [num_queries, num_seeds]
     uint32_t* const num_executed_iterations,  // [num_queries,]
     uint32_t topk,
-    SAMPLE_FILTER_T sample_filter)
-  {
-    auto source_indices_ptr = source_indices.has_value() ? source_indices->data_handle() : nullptr;
-    cudaStream_t stream     = raft::resource::get_cuda_stream(res).get();
-    select_and_run(dataset_desc,
-                   graph,
-                   source_indices_ptr,
-                   intermediate_indices.data(),
-                   intermediate_distances.data(),
-                   queries_ptr,
-                   num_queries,
-                   dev_seed_ptr,
-                   num_executed_iterations,
-                   *this,
-                   topk,
-                   thread_block_size,
-                   result_buffer_size,
-                   smem_size,
-                   small_hash_bitlen,
-                   hash_bitlen,
-                   hashmap.data(),
-                   num_cta_per_query,
-                   num_seeds,
-                   sample_filter,
-                   stream);
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
-
-    // Select the top-k results from the intermediate results
-    const uint32_t num_intermediate_results = num_cta_per_query * itopk_size;
-    auto* output_indices_ptr =
-      kNeedIndexCopy ? intermediate_indices.data() + num_intermediate_results * max_queries
-                     : reinterpret_cast<INDEX_T*>(topk_indices_ptr);
-    _cuann_find_topk(topk,
-                     num_queries,
-                     num_intermediate_results,
-                     intermediate_distances.data(),
-                     num_intermediate_results,
-                     intermediate_indices.data(),
-                     num_intermediate_results,
-                     topk_distances_ptr,
-                     topk,
-                     output_indices_ptr,
-                     topk,
-                     topk_workspace.data(),
-                     true,
-                     NULL,
-                     stream);
-    if (source_indices_ptr != nullptr) {
-      raft::linalg::map(
-        res,
-        raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
-        [source_indices_ptr] __device__(IndexT x) {
-          return static_cast<OutputIndexT>(source_indices_ptr[x]);
-        },
-        raft::make_device_matrix_view<const IndexT, int64_t>(
-          output_indices_ptr, num_queries, topk));
-    } else if constexpr (kNeedIndexCopy) {
-      raft::linalg::map(
-        res,
-        raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
-        raft::cast_op<OutputIndexT>{},
-        raft::make_device_matrix_view<const IndexT, int64_t>(
-          output_indices_ptr, num_queries, topk));
-    }
-  }
+    SAMPLE_FILTER_T sample_filter);
 
   /**
    * Multi-partition search. Drives `search_kernel_mp` across all partitions in one fused
@@ -334,6 +270,112 @@ struct search
       stream);
   }
 };
+
+template <typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename SAMPLE_FILTER_T,
+          typename SourceIndexT,
+          typename OutputIndexT>
+void search<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT>::operator()(
+  raft::resources const& res,
+  raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
+  std::optional<raft::device_vector_view<const SourceIndexT, int64_t>> source_indices,
+  OutputIndexT* const topk_indices_ptr,  // [num_queries, topk]
+  DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
+  const DATA_T* const queries_ptr,       // [num_queries, dataset_dim]
+  const uint32_t num_queries,
+  const INDEX_T* dev_seed_ptr,              // [num_queries, num_seeds]
+  uint32_t* const num_executed_iterations,  // [num_queries,]
+  uint32_t topk,
+  SAMPLE_FILTER_T sample_filter)
+{
+  auto source_indices_ptr = source_indices.has_value() ? source_indices->data_handle() : nullptr;
+  cudaStream_t stream     = raft::resource::get_cuda_stream(res).get();
+  select_and_run(dataset_desc,
+                 graph,
+                 source_indices_ptr,
+                 intermediate_indices.data(),
+                 intermediate_distances.data(),
+                 queries_ptr,
+                 num_queries,
+                 dev_seed_ptr,
+                 num_executed_iterations,
+                 *this,
+                 topk,
+                 thread_block_size,
+                 result_buffer_size,
+                 smem_size,
+                 small_hash_bitlen,
+                 hash_bitlen,
+                 hashmap.data(),
+                 num_cta_per_query,
+                 num_seeds,
+                 sample_filter,
+                 stream);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+
+  // Select the top-k results from the intermediate results
+  const uint32_t num_intermediate_results = num_cta_per_query * itopk_size;
+  auto* output_indices_ptr =
+    kNeedIndexCopy ? intermediate_indices.data() + num_intermediate_results * max_queries
+                   : reinterpret_cast<INDEX_T*>(topk_indices_ptr);
+  _cuann_find_topk(topk,
+                   num_queries,
+                   num_intermediate_results,
+                   intermediate_distances.data(),
+                   num_intermediate_results,
+                   intermediate_indices.data(),
+                   num_intermediate_results,
+                   topk_distances_ptr,
+                   topk,
+                   output_indices_ptr,
+                   topk,
+                   topk_workspace.data(),
+                   true,
+                   NULL,
+                   stream);
+  if (source_indices_ptr != nullptr) {
+    raft::linalg::map(
+      res,
+      raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
+      [source_indices_ptr] __device__(IndexT x) {
+        return static_cast<OutputIndexT>(source_indices_ptr[x]);
+      },
+      raft::make_device_matrix_view<const IndexT, int64_t>(output_indices_ptr, num_queries, topk));
+  } else if constexpr (kNeedIndexCopy) {
+    raft::linalg::map(
+      res,
+      raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
+      raft::cast_op<OutputIndexT>{},
+      raft::make_device_matrix_view<const IndexT, int64_t>(output_indices_ptr, num_queries, topk));
+  }
+}
+
+extern template struct search<float,
+                              uint32_t,
+                              float,
+                              cuvs::neighbors::filtering::none_sample_filter,
+                              uint32_t,
+                              uint32_t>;
+extern template struct search<__half,
+                              uint32_t,
+                              float,
+                              cuvs::neighbors::filtering::none_sample_filter,
+                              uint32_t,
+                              uint32_t>;
+extern template struct search<int8_t,
+                              uint32_t,
+                              float,
+                              cuvs::neighbors::filtering::none_sample_filter,
+                              uint32_t,
+                              uint32_t>;
+extern template struct search<uint8_t,
+                              uint32_t,
+                              float,
+                              cuvs::neighbors::filtering::none_sample_filter,
+                              uint32_t,
+                              uint32_t>;
 
 }  // namespace multi_cta_search
 }  // namespace cuvs::neighbors::cagra::detail

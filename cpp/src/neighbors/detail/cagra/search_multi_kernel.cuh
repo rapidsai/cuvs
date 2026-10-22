@@ -300,226 +300,270 @@ struct search
     const INDEX_T* dev_seed_ptr,              // [num_queries, num_seeds]
     uint32_t* const num_executed_iterations,  // [num_queries,]
     uint32_t topk,
-    SAMPLE_FILTER_T sample_filter)
-  {
-    // Init hashmap
-    cudaStream_t stream      = raft::resource::get_cuda_stream(res).get();
-    const uint32_t hash_size = hashmap::get_size(hash_bitlen);
-    set_value_batch(
-      hashmap.data(), hash_size, utils::get_max_value<INDEX_T>(), hash_size, num_queries, stream);
+    SAMPLE_FILTER_T sample_filter);
+};
 
-    auto source_indices_ptr = source_indices.has_value() ? source_indices->data_handle() : nullptr;
+template <typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename SAMPLE_FILTER_T,
+          typename SourceIndexT,
+          typename OutputIndexT>
+void search<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT>::operator()(
+  raft::resources const& res,
+  raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
+  std::optional<raft::device_vector_view<const SourceIndexT, int64_t>> source_indices,
+  OutputIndexT* const topk_indices_ptr,  // [num_queries, topk]
+  DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
+  const DATA_T* const queries_ptr,       // [num_queries, dataset_dim]
+  const uint32_t num_queries,
+  const INDEX_T* dev_seed_ptr,              // [num_queries, num_seeds]
+  uint32_t* const num_executed_iterations,  // [num_queries,]
+  uint32_t topk,
+  SAMPLE_FILTER_T sample_filter)
+{
+  // Init hashmap
+  cudaStream_t stream      = raft::resource::get_cuda_stream(res).get();
+  const uint32_t hash_size = hashmap::get_size(hash_bitlen);
+  set_value_batch(
+    hashmap.data(), hash_size, utils::get_max_value<INDEX_T>(), hash_size, num_queries, stream);
 
-    // Topk hint can not be used when applying a filter
-    uint32_t* const top_hint_ptr =
-      std::is_same<SAMPLE_FILTER_T, cuvs::neighbors::filtering::none_sample_filter>::value
-        ? topk_hint.data()
-        : nullptr;
-    // Init topk_hint
-    if (top_hint_ptr != nullptr && topk_hint.size() > 0) {
-      set_value(top_hint_ptr, 0xffffffffu, num_queries, stream);
+  auto source_indices_ptr = source_indices.has_value() ? source_indices->data_handle() : nullptr;
+
+  // Topk hint can not be used when applying a filter
+  uint32_t* const top_hint_ptr =
+    std::is_same<SAMPLE_FILTER_T, cuvs::neighbors::filtering::none_sample_filter>::value
+      ? topk_hint.data()
+      : nullptr;
+  // Init topk_hint
+  if (top_hint_ptr != nullptr && topk_hint.size() > 0) {
+    set_value(top_hint_ptr, 0xffffffffu, num_queries, stream);
+  }
+
+  // Choose initial entry point candidates at random
+  random_pickup_jit(dataset_desc,
+                    queries_ptr,
+                    num_queries,
+                    result_buffer_size,
+                    num_random_samplings,
+                    rand_xor_mask,
+                    dev_seed_ptr,
+                    num_seeds,
+                    result_indices.data(),
+                    result_distances.data(),
+                    result_buffer_allocation_size,
+                    hashmap.data(),
+                    hash_bitlen,
+                    stream,
+                    // Bound random seed selection to the graph size, not the dataset size.
+                    // During iterative / CAGRA-Q build the graph is smaller than the dataset,
+                    // so using dataset_size here selects seeds that index past the graph end
+                    // (out-of-bounds access). See https://github.com/NVIDIA/cuvs/pull/1780.
+                    static_cast<IndexT>(graph.extent(0)));
+
+  std::shared_ptr<rtcx::algorithm_launcher> compute_distance_to_child_nodes_launcher =
+    make_cagra_multi_kernel_jit_launcher<DATA_T,
+                                         INDEX_T,
+                                         DISTANCE_T,
+                                         SourceIndexT,
+                                         sample_filter_jit_tag_t<SAMPLE_FILTER_T>>(
+      dataset_desc,
+      "compute_distance_to_child_nodes",
+      make_cagra_sample_filter_udf_fragment<SourceIndexT>(sample_filter));
+
+  unsigned iter = 0;
+  while (1) {
+    // Make an index list of internal top-k nodes
+    _find_topk(res,
+               itopk_size,
+               num_queries,
+               result_buffer_size,
+               result_distances.data() + (iter & 0x1) * itopk_size,
+               result_buffer_allocation_size,
+               result_indices.data() + (iter & 0x1) * itopk_size,
+               result_buffer_allocation_size,
+               result_distances.data() + (1 - (iter & 0x1)) * result_buffer_size,
+               result_buffer_allocation_size,
+               result_indices.data() + (1 - (iter & 0x1)) * result_buffer_size,
+               result_buffer_allocation_size,
+               topk_workspace.data(),
+               true,
+               top_hint_ptr);
+
+    // termination (1)
+    if ((iter + 1 == max_iterations)) {
+      iter++;
+      break;
     }
 
-    // Choose initial entry point candidates at random
-    random_pickup_jit(dataset_desc,
-                      queries_ptr,
-                      num_queries,
-                      result_buffer_size,
-                      num_random_samplings,
-                      rand_xor_mask,
-                      dev_seed_ptr,
-                      num_seeds,
-                      result_indices.data(),
-                      result_distances.data(),
-                      result_buffer_allocation_size,
-                      hashmap.data(),
-                      hash_bitlen,
-                      stream,
-                      // Bound random seed selection to the graph size, not the dataset size.
-                      // During iterative / CAGRA-Q build the graph is smaller than the dataset,
-                      // so using dataset_size here selects seeds that index past the graph end
-                      // (out-of-bounds access). See https://github.com/NVIDIA/cuvs/pull/1780.
-                      static_cast<IndexT>(graph.extent(0)));
+    if (iter + 1 >= min_iterations) { set_value<uint32_t>(terminate_flag.data(), 1, stream); }
 
-    std::shared_ptr<rtcx::algorithm_launcher> compute_distance_to_child_nodes_launcher =
-      make_cagra_multi_kernel_jit_launcher<DATA_T,
+    // pickup parent nodes
+    uint32_t _small_hash_bitlen = 0;
+    if ((iter + 1) % small_hash_reset_interval == 0) { _small_hash_bitlen = small_hash_bitlen; }
+
+    pickup_next_parents(result_indices.data() + (1 - (iter & 0x1)) * result_buffer_size,
+                        result_buffer_allocation_size,
+                        itopk_size,
+                        num_queries,
+                        hashmap.data(),
+                        hash_bitlen,
+                        _small_hash_bitlen,
+                        parent_node_list.data(),
+                        search_width,
+                        search_width,
+                        terminate_flag.data(),
+                        stream);
+
+    // termination (2)
+    if (iter + 1 >= min_iterations) {
+      if (get_value(terminate_flag.data(), stream)) {
+        iter++;
+        break;
+      }
+    }
+
+    // Compute distance to child nodes that are adjacent to the parent node
+    compute_distance_to_child_nodes_jit(
+      parent_node_list.data(),
+      result_indices.data() + (1 - (iter & 0x1)) * result_buffer_size,
+      result_distances.data() + (1 - (iter & 0x1)) * result_buffer_size,
+      result_buffer_allocation_size,
+      search_width,
+      dataset_desc,
+      graph.data_handle(),
+      graph.extent(1),
+      source_indices_ptr,
+      queries_ptr,
+      num_queries,
+      hashmap.data(),
+      hash_bitlen,
+      result_indices.data() + itopk_size,
+      result_distances.data() + itopk_size,
+      result_buffer_allocation_size,
+      sample_filter,
+      stream,
+      compute_distance_to_child_nodes_launcher);
+
+    iter++;
+  }  // while ( 1 )
+  auto result_indices_ptr   = result_indices.data() + (iter & 0x1) * result_buffer_size;
+  auto result_distances_ptr = result_distances.data() + (iter & 0x1) * result_buffer_size;
+
+  if constexpr (!std::is_same<SAMPLE_FILTER_T,
+                              cuvs::neighbors::filtering::none_sample_filter>::value) {
+    // Remove parent bit in search results
+    remove_parent_bit(num_queries,
+                      result_buffer_size,
+                      result_indices.data() + (iter & 0x1) * itopk_size,
+                      result_buffer_allocation_size,
+                      stream);
+
+    std::shared_ptr<rtcx::algorithm_launcher> apply_filter_launcher =
+      make_cagra_apply_filter_jit_launcher<DATA_T,
                                            INDEX_T,
                                            DISTANCE_T,
                                            SourceIndexT,
                                            sample_filter_jit_tag_t<SAMPLE_FILTER_T>>(
-        dataset_desc,
-        "compute_distance_to_child_nodes",
-        make_cagra_sample_filter_udf_fragment<SourceIndexT>(sample_filter));
+        dataset_desc, make_cagra_sample_filter_udf_fragment<SourceIndexT>(sample_filter));
 
-    unsigned iter = 0;
-    while (1) {
-      // Make an index list of internal top-k nodes
-      _find_topk(res,
-                 itopk_size,
-                 num_queries,
-                 result_buffer_size,
-                 result_distances.data() + (iter & 0x1) * itopk_size,
-                 result_buffer_allocation_size,
-                 result_indices.data() + (iter & 0x1) * itopk_size,
-                 result_buffer_allocation_size,
-                 result_distances.data() + (1 - (iter & 0x1)) * result_buffer_size,
-                 result_buffer_allocation_size,
-                 result_indices.data() + (1 - (iter & 0x1)) * result_buffer_size,
-                 result_buffer_allocation_size,
-                 topk_workspace.data(),
-                 true,
-                 top_hint_ptr);
+    apply_filter_jit<INDEX_T, DISTANCE_T, SourceIndexT, SAMPLE_FILTER_T>(
+      source_indices_ptr,
+      result_indices.data() + (iter & 0x1) * itopk_size,
+      result_distances.data() + (iter & 0x1) * itopk_size,
+      result_buffer_allocation_size,
+      result_buffer_size,
+      num_queries,
+      0,
+      sample_filter,
+      stream,
+      apply_filter_launcher);
 
-      // termination (1)
-      if ((iter + 1 == max_iterations)) {
-        iter++;
-        break;
-      }
+    result_indices_ptr   = result_indices.data() + (1 - (iter & 0x1)) * result_buffer_size;
+    result_distances_ptr = result_distances.data() + (1 - (iter & 0x1)) * result_buffer_size;
+    _find_topk(res,
+               itopk_size,
+               num_queries,
+               result_buffer_size,
+               result_distances.data() + (iter & 0x1) * itopk_size,
+               result_buffer_allocation_size,
+               result_indices.data() + (iter & 0x1) * itopk_size,
+               result_buffer_allocation_size,
+               result_distances_ptr,
+               result_buffer_allocation_size,
+               result_indices_ptr,
+               result_buffer_allocation_size,
+               topk_workspace.data(),
+               true,
+               top_hint_ptr);
+  } else {
+    // Remove parent bit in search results
+    remove_parent_bit(
+      num_queries, itopk_size, result_indices_ptr, result_buffer_allocation_size, stream);
+  }
 
-      if (iter + 1 >= min_iterations) { set_value<uint32_t>(terminate_flag.data(), 1, stream); }
+  // Copy results from working buffer to final buffer
+  if (source_indices_ptr != nullptr) {
+    auto buf_result_indices = raft::make_device_matrix_view<const INDEX_T, int64_t>(
+      result_indices_ptr, num_queries, result_buffer_allocation_size);
+    raft::linalg::map_offset(
+      res,
+      raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
+      [source_indices_ptr, buf_result_indices, topk] __device__(auto offset) {
+        auto i = offset / topk;
+        auto j = offset % topk;
+        return static_cast<OutputIndexT>(source_indices_ptr[buf_result_indices(i, j)]);
+      });
+  } else {
+    batched_memcpy(topk_indices_ptr,
+                   topk,
+                   result_indices_ptr,
+                   result_buffer_allocation_size,
+                   topk,
+                   num_queries,
+                   stream);
+  }
+  if (topk_distances_ptr) {
+    batched_memcpy(topk_distances_ptr,
+                   topk,
+                   result_distances_ptr,
+                   result_buffer_allocation_size,
+                   topk,
+                   num_queries,
+                   stream);
+  }
 
-      // pickup parent nodes
-      uint32_t _small_hash_bitlen = 0;
-      if ((iter + 1) % small_hash_reset_interval == 0) { _small_hash_bitlen = small_hash_bitlen; }
-
-      pickup_next_parents(result_indices.data() + (1 - (iter & 0x1)) * result_buffer_size,
-                          result_buffer_allocation_size,
-                          itopk_size,
-                          num_queries,
-                          hashmap.data(),
-                          hash_bitlen,
-                          _small_hash_bitlen,
-                          parent_node_list.data(),
-                          search_width,
-                          search_width,
-                          terminate_flag.data(),
-                          stream);
-
-      // termination (2)
-      if (iter + 1 >= min_iterations) {
-        if (get_value(terminate_flag.data(), stream)) {
-          iter++;
-          break;
-        }
-      }
-
-      // Compute distance to child nodes that are adjacent to the parent node
-      compute_distance_to_child_nodes_jit(
-        parent_node_list.data(),
-        result_indices.data() + (1 - (iter & 0x1)) * result_buffer_size,
-        result_distances.data() + (1 - (iter & 0x1)) * result_buffer_size,
-        result_buffer_allocation_size,
-        search_width,
-        dataset_desc,
-        graph.data_handle(),
-        graph.extent(1),
-        source_indices_ptr,
-        queries_ptr,
-        num_queries,
-        hashmap.data(),
-        hash_bitlen,
-        result_indices.data() + itopk_size,
-        result_distances.data() + itopk_size,
-        result_buffer_allocation_size,
-        sample_filter,
-        stream,
-        compute_distance_to_child_nodes_launcher);
-
-      iter++;
-    }  // while ( 1 )
-    auto result_indices_ptr   = result_indices.data() + (iter & 0x1) * result_buffer_size;
-    auto result_distances_ptr = result_distances.data() + (iter & 0x1) * result_buffer_size;
-
-    if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                                cuvs::neighbors::filtering::none_sample_filter>::value) {
-      // Remove parent bit in search results
-      remove_parent_bit(num_queries,
-                        result_buffer_size,
-                        result_indices.data() + (iter & 0x1) * itopk_size,
-                        result_buffer_allocation_size,
-                        stream);
-
-      std::shared_ptr<rtcx::algorithm_launcher> apply_filter_launcher =
-        make_cagra_apply_filter_jit_launcher<DATA_T,
-                                             INDEX_T,
-                                             DISTANCE_T,
-                                             SourceIndexT,
-                                             sample_filter_jit_tag_t<SAMPLE_FILTER_T>>(
-          dataset_desc, make_cagra_sample_filter_udf_fragment<SourceIndexT>(sample_filter));
-
-      apply_filter_jit<INDEX_T, DISTANCE_T, SourceIndexT, SAMPLE_FILTER_T>(
-        source_indices_ptr,
-        result_indices.data() + (iter & 0x1) * itopk_size,
-        result_distances.data() + (iter & 0x1) * itopk_size,
-        result_buffer_allocation_size,
-        result_buffer_size,
-        num_queries,
-        0,
-        sample_filter,
-        stream,
-        apply_filter_launcher);
-
-      result_indices_ptr   = result_indices.data() + (1 - (iter & 0x1)) * result_buffer_size;
-      result_distances_ptr = result_distances.data() + (1 - (iter & 0x1)) * result_buffer_size;
-      _find_topk(res,
-                 itopk_size,
-                 num_queries,
-                 result_buffer_size,
-                 result_distances.data() + (iter & 0x1) * itopk_size,
-                 result_buffer_allocation_size,
-                 result_indices.data() + (iter & 0x1) * itopk_size,
-                 result_buffer_allocation_size,
-                 result_distances_ptr,
-                 result_buffer_allocation_size,
-                 result_indices_ptr,
-                 result_buffer_allocation_size,
-                 topk_workspace.data(),
-                 true,
-                 top_hint_ptr);
-    } else {
-      // Remove parent bit in search results
-      remove_parent_bit(
-        num_queries, itopk_size, result_indices_ptr, result_buffer_allocation_size, stream);
-    }
-
-    // Copy results from working buffer to final buffer
-    if (source_indices_ptr != nullptr) {
-      auto buf_result_indices = raft::make_device_matrix_view<const INDEX_T, int64_t>(
-        result_indices_ptr, num_queries, result_buffer_allocation_size);
-      raft::linalg::map_offset(
-        res,
-        raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
-        [source_indices_ptr, buf_result_indices, topk] __device__(auto offset) {
-          auto i = offset / topk;
-          auto j = offset % topk;
-          return static_cast<OutputIndexT>(source_indices_ptr[buf_result_indices(i, j)]);
-        });
-    } else {
-      batched_memcpy(topk_indices_ptr,
-                     topk,
-                     result_indices_ptr,
-                     result_buffer_allocation_size,
-                     topk,
-                     num_queries,
-                     stream);
-    }
-    if (topk_distances_ptr) {
-      batched_memcpy(topk_distances_ptr,
-                     topk,
-                     result_distances_ptr,
-                     result_buffer_allocation_size,
-                     topk,
-                     num_queries,
-                     stream);
-    }
-
-    if (num_executed_iterations) {
-      for (std::uint32_t i = 0; i < num_queries; i++) {
-        num_executed_iterations[i] = iter;
-      }
+  if (num_executed_iterations) {
+    for (std::uint32_t i = 0; i < num_queries; i++) {
+      num_executed_iterations[i] = iter;
     }
   }
-};
+}
+
+extern template struct search<float,
+                              uint32_t,
+                              float,
+                              cuvs::neighbors::filtering::none_sample_filter,
+                              uint32_t,
+                              uint32_t>;
+extern template struct search<__half,
+                              uint32_t,
+                              float,
+                              cuvs::neighbors::filtering::none_sample_filter,
+                              uint32_t,
+                              uint32_t>;
+extern template struct search<int8_t,
+                              uint32_t,
+                              float,
+                              cuvs::neighbors::filtering::none_sample_filter,
+                              uint32_t,
+                              uint32_t>;
+extern template struct search<uint8_t,
+                              uint32_t,
+                              float,
+                              cuvs::neighbors::filtering::none_sample_filter,
+                              uint32_t,
+                              uint32_t>;
 
 }  // namespace multi_kernel_search
 }  // namespace cuvs::neighbors::cagra::detail
