@@ -5,6 +5,7 @@
 
 #include "../neighbors/detail/ann_utils.cuh"
 #include "map.hpp"
+#include "map_ownership.hpp"
 
 namespace cuvs::detail {
 
@@ -17,3 +18,7 @@ void map_impl(cuda::stream_ref stream, OutT* out_ptr, IdxT len, Func f, const In
 // EXPLICIT_HOST_INSTANTIATIONS
 
 }  // namespace cuvs::detail
+
+#define CUVS_MAP_INSTANTIATION(...) template __VA_ARGS__;
+#include "map_instantiations.inl"
+#undef CUVS_MAP_INSTANTIATION

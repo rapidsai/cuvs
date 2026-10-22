@@ -1636,6 +1636,13 @@ if(NOT BUILD_CPU_ONLY)
                                  ${CUVS_CUSPARSE_DEPENDENCY} ${CUVS_CURAND_DEPENDENCY}
   )
 
+  # Declare shared host instantiations before nested dependency calls can
+  # instantiate them. Kernel definitions and launches remain in map.cu.
+  target_compile_options(
+    cuvs_objs PRIVATE
+    "$<$<COMPILE_LANGUAGE:CUDA>:--pre-include=${CMAKE_CURRENT_SOURCE_DIR}/src/core/map_ownership.hpp>"
+  )
+
   if(NOT cuvs_compile_mode STREQUAL "static_only")
     add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
     add_library(cuvs::cuvs ALIAS cuvs)
