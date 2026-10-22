@@ -249,6 +249,12 @@ SPDX-License-Identifier: Apache-2.0
               </execution>
           </executions>
       </plugin>
+      <plugin>
+        <!-- Not bound to a phase: pins the version used by 'mvn install:install-file' in build.sh and ci/*_lucene.sh. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>3.1.4</version>
+      </plugin>
     </plugins>
   </build>
 
