@@ -4845,8 +4845,13 @@ def clean_javadoc_text(text: str) -> str:
         r"\{@literal\s+([^}]+)\}", lambda m: keep(words(m.group(1))), text
     )
     text = re.sub(
-        r"\{@link(?:plain)?\s+([^}\s]+)(?:\s+([^}]+))?\}",
-        lambda m: keep(words(m.group(2)) if m.group(2) else f"`{m.group(1)}`"),
+        # The reference may wrap inside its argument list, e.g. #m(A,\nB).
+        r"\{@link(?:plain)?\s+([^}\s(]+(?:\([^)]*\))?)(?:\s+([^}]+))?\}",
+        lambda m: keep(
+            words(m.group(2))
+            if m.group(2)
+            else f"`{' '.join(m.group(1).split())}`"
+        ),
         text,
     )
     # Any other inline tag shows its text.

@@ -666,7 +666,7 @@ dependencies:
     common:
       - output_types: conda
         packages:
-          - maven
+          - maven=3.9.*
           # The oldest JDK cuvs-lucene supports; cuvs-java needs 22+ to use the GPU.
           - openjdk=21.*
   bench:

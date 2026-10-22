@@ -352,7 +352,7 @@ _Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/CuVSCodecs.java:
 public static KnnVectorsFormat gpuSearchFormat( GPUSearchParams params, FilterBitsetCacheConfig filterCacheConfig)
 ```
 
-Returns the vectors format used by FilterBitsetCacheConfig), for use with a per-field codec.
+Returns the vectors format used by `#gpuSearch(GPUSearchParams, FilterBitsetCacheConfig)`, for use with a per-field codec.
 
 **Parameters**
 

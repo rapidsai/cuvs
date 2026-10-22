@@ -54,7 +54,7 @@ Lucene 10.2, add the following dependency to your `pom.xml`:
 </dependency>
 ```
 
-Until 26.10 the artifact was called `cuvs-lucene`; those coordinates now relocate to `cuvs-lucene-10.2`.
+Releases up to 26.10 published it as `cuvs-lucene`; those coordinates now relocate to `cuvs-lucene-10.2`.
 
 Against another Lucene minor release, an artifact's codecs fail when they are used, with an error that names
 the artifact to use; the problem is also logged at `SEVERE` the first time Lucene looks up its codecs. Call
