@@ -859,3 +859,22 @@ CUVS_REDUCTION_INSTANTIATION(
                                                                          raft::identity_op,
                                                                          raft::add_op,
                                                                          raft::mul_const_op<float>))
+
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::coalescedReduction<float,
+                                                float,
+                                                long,
+                                                raft::identity_op,
+                                                raft::add_op,
+                                                raft::mul_const_op<float>>(
+    bool,
+    float*,
+    float const*,
+    long,
+    long,
+    float,
+    cudaStream_t,
+    bool,
+    raft::identity_op,
+    raft::add_op,
+    raft::mul_const_op<float>))
