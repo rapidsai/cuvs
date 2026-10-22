@@ -69,3 +69,13 @@ CUVS_SELECTION_INSTANTIATION(
                                                      bool,
                                                      raft::matrix::SelectAlgo,
                                                      const uint32_t*))
+
+CUVS_SELECTION_INSTANTIATION(void raft::sparse::matrix::detail::select_k<float, int64_t>(
+  const raft::resources&,
+  raft::device_csr_matrix_view<const float, int64_t, int64_t, int64_t>,
+  std::optional<raft::device_vector_view<const int64_t, int64_t>>,
+  raft::device_matrix_view<float, int64_t, raft::row_major>,
+  raft::device_matrix_view<int64_t, int64_t, raft::row_major>,
+  bool,
+  bool,
+  raft::matrix::SelectAlgo))
