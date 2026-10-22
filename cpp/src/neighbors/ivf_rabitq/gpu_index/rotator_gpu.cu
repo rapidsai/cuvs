@@ -7,6 +7,7 @@
 // Created by Stardust on 3/24/25.
 //
 
+#include "../../../core/random.hpp"
 #include "rotator_gpu.cuh"
 
 #include <raft/core/device_mdspan.hpp>
@@ -26,7 +27,7 @@ RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
     rotation_matrix_(raft::make_device_matrix<float, int64_t, raft::row_major>(handle, D, D))
 {
   raft::random::RngState rng(7ULL);
-  raft::random::normal(handle, rng, rotation_matrix_.data_handle(), D * D, 0.0f, 1.0f);
+  cuvs::detail::normal(handle, rng, rotation_matrix_.data_handle(), D * D, 0.0f, 1.0f);
   raft::linalg::detail::qrGetQ_inplace(
     handle, rotation_matrix_.data_handle(), D, D, raft::resource::get_cuda_stream(handle).get());
 }

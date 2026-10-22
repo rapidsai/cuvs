@@ -6,6 +6,7 @@
 #pragma once
 
 #include "../../core/nvtx.hpp"
+#include "../../core/random.hpp"
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
 
@@ -473,7 +474,7 @@ inline auto build(
       handle,
       raft::resource::get_large_workspace_resource_ref(handle),
       raft::make_extents<int64_t>(static_cast<int64_t>(n_rows_train), idx.dim()));
-    raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
+    cuvs::detail::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     auto trainset_const_view = raft::make_const_mdspan(trainset.view());
     auto centers_view        = raft::make_device_matrix_view<float, int64_t>(
       idx.centers().data_handle(), idx.n_lists(), idx.dim());

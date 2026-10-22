@@ -5,6 +5,7 @@
 #pragma once
 
 #include "../../core/nvtx.hpp"
+#include "../../core/random.hpp"
 #include "../../neighbors/detail/ann_utils.cuh"
 #include "kmeans_batch_loader.cuh"
 #include "kmeans_common.cuh"
@@ -518,7 +519,7 @@ void initScalableKMeansPlusPlus(raft::resources const& handle,
 
     // <<<< Step-4 >>> : Sample each point x in X independently and identify new
     // potentialCentroids
-    raft::random::uniform(
+    cuvs::detail::uniform(
       handle, rng, uniformRands.data_handle(), uniformRands.extent(0), (DataT)0, (DataT)1);
 
     cuvs::cluster::kmeans::detail::SamplingOp<DataT, IndexT> select_op(
@@ -774,7 +775,7 @@ void kmeans_fit(
     raft::random::RngState random_state(iter_params.rng_state.seed);
 
     if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
-      raft::matrix::sample_rows(handle, random_state, X, centroidsRawData);
+      cuvs::detail::sample_rows(handle, random_state, X, centroidsRawData);
     } else if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
       auto run_kmeanspp = [&](raft::device_matrix_view<const DataT, IndexT> init_data) {
         if (iter_params.oversampling_factor == 0)
@@ -787,7 +788,7 @@ void kmeans_fit(
       if constexpr (data_on_device) {
         run_kmeanspp(X);
       } else {
-        raft::matrix::sample_rows(handle, random_state, X, init_sample->view());
+        cuvs::detail::sample_rows(handle, random_state, X, init_sample->view());
         run_kmeanspp(raft::make_const_mdspan(init_sample->view()));
       }
     } else {

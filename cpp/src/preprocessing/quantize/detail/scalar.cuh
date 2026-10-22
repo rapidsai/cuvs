@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/random.hpp"
 #include <cuvs/preprocessing/quantize/scalar.hpp>
 #include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
@@ -90,7 +91,7 @@ std::tuple<T, T> quantile_min_max(
   size_t n_sample_rows = std::min<size_t>(std::ceil(max_num_samples / dim), n_rows);
 
   // select subsample rows (this returns device data for both device and host input)
-  auto subset = raft::matrix::sample_rows(res, rng, dataset, (IdxT)n_sample_rows);
+  auto subset = cuvs::detail::sample_rows(res, rng, dataset, (IdxT)n_sample_rows);
 
   // quantile / sort element-wise and pick for now
   auto subset_size = static_cast<int64_t>(n_sample_rows * dim);

@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/random.hpp"
 #include <cuvs/preprocessing/quantize/binary.hpp>
 #include <raft/core/copy.cuh>
 #include <raft/core/device_mdspan.hpp>
@@ -224,7 +225,7 @@ auto train(raft::resources const& res,
         raft::make_device_matrix_view<T, int64_t>(sampled_dataset_chunk.data_handle(),
                                                   static_cast<int64_t>(num_samples),
                                                   static_cast<int64_t>(dim_chunk));
-      raft::matrix::sample_rows(
+      cuvs::detail::sample_rows(
         res,
         rng,
         raft::make_device_strided_matrix_view<const T, int64_t>(

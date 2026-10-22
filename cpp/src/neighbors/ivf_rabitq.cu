@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "../core/random.hpp"
 #include "ivf_rabitq/gpu_index/ivf_gpu.cuh"
 #include "ivf_rabitq/gpu_index/searcher_gpu.cuh"
 #include <cuvs/cluster/kmeans.hpp>
@@ -124,7 +125,7 @@ auto build(raft::resources const& handle,
         "max_train_points_per_cluster, or set large_workspace_resource appropriately.");
       throw;
     }
-    raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
+    cuvs::detail::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
 
     // perform k-means clustering
     // NB: here cluster_centers is used as if it is [n_clusters, data_dim] not [n_clusters,

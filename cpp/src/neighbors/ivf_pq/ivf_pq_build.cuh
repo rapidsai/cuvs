@@ -6,6 +6,7 @@
 #pragma once
 
 #include "../../core/nvtx.hpp"
+#include "../../core/random.hpp"
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
 #include "../ivf_pq_impl.hpp"
@@ -1313,7 +1314,7 @@ auto build(raft::resources const& handle,
     }
     // TODO: a proper sampling
     if constexpr (std::is_same_v<T, float>) {
-      raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
+      cuvs::detail::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     } else {
       raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
         "   ivf_pq::build(%zu, %zu)/sample rows with tmp trainset (%zu rows).",
@@ -1325,7 +1326,7 @@ auto build(raft::resources const& handle,
       auto trainset_tmp = raft::make_device_mdarray<T>(
         handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
 
-      raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset_tmp.view());
+      cuvs::detail::sample_rows<T, int64_t>(handle, random_state, dataset, trainset_tmp.view());
 
       raft::linalg::map(handle,
                         raft::make_device_vector_view<float, int64_t>(trainset.data_handle(),

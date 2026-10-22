@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/random.hpp"
 #include "../../detail/ann_utils.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/scann.hpp>
@@ -85,7 +86,7 @@ void train_kmeans(
     throw;
   }
 
-  raft::matrix::sample_rows(res, random_state, dataset, trainset.view());
+  cuvs::detail::sample_rows(res, random_state, dataset, trainset.view());
 
   if (type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
     cuvs::cluster::kmeans::balanced_params kmeans_params;

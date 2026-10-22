@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../core/random.hpp"
 #include "gmm_kernels.cuh"
 
 #include <cuvs/cluster/gmm.hpp>
@@ -973,7 +974,7 @@ void fit_impl(raft::resources const& handle,
         kmeans_assign<T>(handle, params, X, n, d, K, init_seed, km_labels.data());
       } else if (im == init_method::RandomFromData) {
         rfd_idx.resize(K, stream);
-        auto idx = raft::random::excess_subsample<int, int>(handle, rng, n, K);
+        auto idx = cuvs::detail::excess_subsample<int, int>(handle, rng, n, K);
         raft::copy(rfd_idx.data(), idx.data_handle(), K, stream);
       }
       auto fill_init_resp = [&](int t0, int nt) {
@@ -984,7 +985,7 @@ void fit_impl(raft::resources const& handle,
           raft::random::RngState tile_rng(
             init_seed ^ (static_cast<uint64_t>(t0) * 0x9E3779B97F4A7C15ULL),
             raft::random::GeneratorType::GenPhilox);
-          raft::random::uniform(handle, tile_rng, resp.data(), (size_t)nt * K, T(0), T(1));
+          cuvs::detail::uniform(handle, tile_rng, resp.data(), (size_t)nt * K, T(0), T(1));
           detail::normalize_rows_kernel<T>
             <<<dim3((nt + 255) / 256), dim3(256), 0, stream>>>(resp.data(), nt, K);
         } else if (im == init_method::RandomFromData) {

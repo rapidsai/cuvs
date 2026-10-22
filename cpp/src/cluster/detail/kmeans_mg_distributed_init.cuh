@@ -5,6 +5,7 @@
 #pragma once
 
 #include "../../core/mnmg_comms.cuh"
+#include "../../core/random.hpp"
 #include "kmeans.cuh"
 #include "kmeans_common.cuh"
 #include "kmeans_mg_batched_init.cuh"
@@ -330,7 +331,7 @@ void initKMeansPlusPlus_distributed(
     if (n_local > 0) {
       auto rands_view =
         raft::make_device_vector_view<DataT, IndexT>(uniformRands.data_handle(), n_local);
-      raft::random::uniform(handle, rng, rands_view.data_handle(), n_local, DataT{0}, DataT{1});
+      cuvs::detail::uniform(handle, rng, rands_view.data_handle(), n_local, DataT{0}, DataT{1});
     }
 
     // Sample per partition; collect into a rank-local concatenated buffer.

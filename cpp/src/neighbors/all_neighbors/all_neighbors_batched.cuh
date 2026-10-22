@@ -5,6 +5,7 @@
 
 #pragma once
 #include "../../core/omp_wrapper.hpp"
+#include "../../core/random.hpp"
 #include "../detail/reachability.cuh"
 #include "all_neighbors_builder.cuh"
 #include "raft/core/logger_macros.hpp"
@@ -93,7 +94,7 @@ void get_centroids_on_data_subsample(raft::resources const& res,
   }
   auto dataset_subsample_d = raft::make_device_matrix<T, IdxT>(res, num_subsamples, num_cols);
 
-  raft::matrix::sample_rows<T, IdxT>(
+  cuvs::detail::sample_rows<T, IdxT>(
     res, raft::random::RngState{0}, dataset, dataset_subsample_d.view());
   cuvs::cluster::kmeans::balanced_params kmeans_params;
   kmeans_params.metric = metric;

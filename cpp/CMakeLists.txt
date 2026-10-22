@@ -1413,6 +1413,7 @@ if(NOT BUILD_CPU_ONLY)
 
   add_library(
     cuvs_objs OBJECT
+    src/core/random.cu
     src/cluster/detail/minClusterDistanceCompute.cu
     src/cluster/agglomerative.cu
     src/cluster/gmm_double.cu
