@@ -592,3 +592,20 @@ INSTANTIATE_MIN_CLUSTER_DISTANCE(double, int)
 #undef INSTANTIATE_MIN_CLUSTER_DISTANCE
 
 }  // namespace cuvs::cluster::kmeans::detail
+
+namespace cuvs::cluster::kmeans::detail {
+template void copyClusterLabels<int, float, int>(const raft::resources&,
+                                                 const MinClusterAndDistanceResult<float, int>&,
+                                                 int*);
+template void copyClusterLabels<int, double, int>(const raft::resources&,
+                                                  const MinClusterAndDistanceResult<double, int>&,
+                                                  int*);
+template void copyClusterLabels<int, float, int64_t>(
+  const raft::resources&, const MinClusterAndDistanceResult<float, int64_t>&, int*);
+template void copyClusterLabels<int64_t, float, int64_t>(
+  const raft::resources&, const MinClusterAndDistanceResult<float, int64_t>&, int64_t*);
+template void copyClusterLabels<int64_t, double, int64_t>(
+  const raft::resources&, const MinClusterAndDistanceResult<double, int64_t>&, int64_t*);
+template void copyClusterLabels<uint32_t, float, int64_t>(
+  const raft::resources&, const MinClusterAndDistanceResult<float, int64_t>&, uint32_t*);
+}  // namespace cuvs::cluster::kmeans::detail
