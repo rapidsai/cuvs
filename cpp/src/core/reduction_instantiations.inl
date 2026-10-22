@@ -4,6 +4,62 @@
  */
 
 // Included for extern declarations and owning definitions.
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    coalescedReduction<double, double, int, raft::identity_op, raft::min_op, raft::identity_op>(
+      bool,
+      double*,
+      double const*,
+      int,
+      int,
+      double,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::min_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    coalescedReduction<double, double, long, raft::identity_op, raft::min_op, raft::identity_op>(
+      bool,
+      double*,
+      double const*,
+      long,
+      long,
+      double,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::min_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    coalescedReduction<float, float, int, raft::identity_op, raft::min_op, raft::identity_op>(
+      bool,
+      float*,
+      float const*,
+      int,
+      int,
+      float,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::min_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    coalescedReduction<float, float, long, raft::identity_op, raft::min_op, raft::identity_op>(
+      bool,
+      float*,
+      float const*,
+      long,
+      long,
+      float,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::min_op,
+      raft::identity_op))
 CUVS_REDUCTION_INSTANTIATION(void raft::linalg::detail::coalescedReductionThin<
                              raft::linalg::detail::ReductionThinPolicy<32, 128, 1, false>,
                              double,
@@ -463,6 +519,330 @@ CUVS_REDUCTION_INSTANTIATION(
     raft::compose_op<raft::sq_op, raft::plug_const_op<float, raft::div_op>, raft::cast_op<float>>,
     raft::add_op,
     raft::sqrt_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<false, true, __half, float, int, raft::identity_op, raft::add_op, raft::identity_op>(
+      bool,
+      float*,
+      __half const*,
+      int,
+      int,
+      float,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::add_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<false, true, double, double, int, raft::identity_op, raft::add_op, raft::identity_op>(
+      bool,
+      double*,
+      double const*,
+      int,
+      int,
+      double,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::add_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<false, true, float, float, int, raft::identity_op, raft::add_op, raft::identity_op>(
+      bool,
+      float*,
+      float const*,
+      int,
+      int,
+      float,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::add_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, false, double, double, int, raft::identity_op, raft::add_op, raft::identity_op>(
+      bool,
+      double*,
+      double const*,
+      int,
+      int,
+      double,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::add_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, false, float, float, int, raft::identity_op, raft::add_op, raft::identity_op>(
+      bool,
+      float*,
+      float const*,
+      int,
+      int,
+      float,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::add_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, false, float, float, long, raft::identity_op, raft::add_op, raft::identity_op>(
+      bool,
+      float*,
+      float const*,
+      long,
+      long,
+      float,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::add_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, true, __half, float, int, raft::identity_op, raft::add_op, raft::identity_op>(
+      bool,
+      float*,
+      __half const*,
+      int,
+      int,
+      float,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::add_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, true, double, double, int, raft::identity_op, raft::add_op, raft::identity_op>(
+      bool,
+      double*,
+      double const*,
+      int,
+      int,
+      double,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::add_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, true, double, double, int, raft::identity_op, raft::min_op, raft::identity_op>(
+      bool,
+      double*,
+      double const*,
+      int,
+      int,
+      double,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::min_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, true, double, double, long, raft::identity_op, raft::add_op, raft::identity_op>(
+      bool,
+      double*,
+      double const*,
+      long,
+      long,
+      double,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::add_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, true, double, double, long, raft::identity_op, raft::min_op, raft::identity_op>(
+      bool,
+      double*,
+      double const*,
+      long,
+      long,
+      double,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::min_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, true, float, float, int, raft::identity_op, raft::add_op, raft::identity_op>(
+      bool,
+      float*,
+      float const*,
+      int,
+      int,
+      float,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::add_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, true, float, float, int, raft::identity_op, raft::min_op, raft::identity_op>(
+      bool,
+      float*,
+      float const*,
+      int,
+      int,
+      float,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::min_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, true, float, float, long, raft::identity_op, raft::add_op, raft::identity_op>(
+      bool,
+      float*,
+      float const*,
+      long,
+      long,
+      float,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::add_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, true, float, float, long, raft::identity_op, raft::min_op, raft::identity_op>(
+      bool,
+      float*,
+      float const*,
+      long,
+      long,
+      float,
+      CUstream_st*,
+      bool,
+      raft::identity_op,
+      raft::min_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    reduce<true, true, float, float, long, raft::sq_op, raft::add_op, raft::identity_op>(
+      bool,
+      float*,
+      float const*,
+      long,
+      long,
+      float,
+      CUstream_st*,
+      bool,
+      raft::sq_op,
+      raft::add_op,
+      raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, false, __half, int, raft::identity_op, float>(
+      bool, float*, __half const*, int, int, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, false, __half, int, raft::sqrt_op, float>(
+      bool, float*, __half const*, int, int, CUstream_st*, raft::sqrt_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, false, __half, long, raft::identity_op, float>(
+      bool, float*, __half const*, long, long, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, false, __half, long, raft::sqrt_op, float>(
+      bool, float*, __half const*, long, long, CUstream_st*, raft::sqrt_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, false, double, int, raft::identity_op, double>(
+      bool, double*, double const*, int, int, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, false, double, int, raft::sqrt_op, double>(
+      bool, double*, double const*, int, int, CUstream_st*, raft::sqrt_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, false, double, long, raft::identity_op, double>(
+      bool, double*, double const*, long, long, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, false, float, int, raft::identity_op, float>(
+      bool, float*, float const*, int, int, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, false, float, int, raft::sqrt_op, float>(
+      bool, float*, float const*, int, int, CUstream_st*, raft::sqrt_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, false, float, long, raft::identity_op, float>(
+      bool, float*, float const*, long, long, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, false, float, long, raft::sqrt_op, float>(
+      bool, float*, float const*, long, long, CUstream_st*, raft::sqrt_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, __half, int, raft::identity_op, float>(
+      bool, float*, __half const*, int, int, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, __half, int, raft::sqrt_op, float>(
+      bool, float*, __half const*, int, int, CUstream_st*, raft::sqrt_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, __half, long, raft::identity_op, float>(
+      bool, float*, __half const*, long, long, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, __half, long, raft::sqrt_op, float>(
+      bool, float*, __half const*, long, long, CUstream_st*, raft::sqrt_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, double, int, raft::identity_op, double>(
+      bool, double*, double const*, int, int, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, double, int, raft::sqrt_op, double>(
+      bool, double*, double const*, int, int, CUstream_st*, raft::sqrt_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, double, long, raft::identity_op, double>(
+      bool, double*, double const*, long, long, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, double, long, raft::sqrt_op, double>(
+      bool, double*, double const*, long, long, CUstream_st*, raft::sqrt_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, float, int, raft::identity_op, float>(
+      bool, float*, float const*, int, int, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, float, int, raft::sqrt_op, float>(
+      bool, float*, float const*, int, int, CUstream_st*, raft::sqrt_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, float, long, raft::identity_op, float>(
+      bool, float*, float const*, long, long, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, float, long, raft::sqrt_op, float>(
+      bool, float*, float const*, long, long, CUstream_st*, raft::sqrt_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, float, unsigned int, raft::identity_op, float>(
+      bool, float*, float const*, unsigned int, unsigned int, CUstream_st*, raft::identity_op))
+CUVS_REDUCTION_INSTANTIATION(
+  void raft::linalg::detail::
+    rowNormCaller<(raft::linalg::NormType)2, true, float, unsigned int, raft::sqrt_op, float>(
+      bool, float*, float const*, unsigned int, unsigned int, CUstream_st*, raft::sqrt_op))
 CUVS_REDUCTION_INSTANTIATION(
   void raft::linalg::detail::stridedReduction<float,
                                               float,
