@@ -73,6 +73,102 @@ cudaError_t histogram_even(void* storage,
     storage, bytes, samples, counts, levels, lower, upper, count, stream);
 }
 
-// EXPLICIT_HOST_INSTANTIATIONS
+template cudaError_t cuvs::detail::histogram_even<
+  ::cuda::transform_iterator<
+    cuvs::distance::detail::Top1nnResultTraits<raft::KeyValuePair<int, double>*>::key_op,
+    raft::KeyValuePair<int, double>*>,
+  double,
+  int,
+  int>(void*,
+       unsigned long&,
+       ::cuda::transform_iterator<
+         cuvs::distance::detail::Top1nnResultTraits<raft::KeyValuePair<int, double>*>::key_op,
+         raft::KeyValuePair<int, double>*>,
+       double*,
+       int,
+       int,
+       int,
+       int,
+       cudaStream_t);
+template cudaError_t cuvs::detail::histogram_even<
+  ::cuda::transform_iterator<
+    cuvs::distance::detail::Top1nnResultTraits<raft::KeyValuePair<int, float>*>::key_op,
+    raft::KeyValuePair<int, float>*>,
+  float,
+  int,
+  int>(void*,
+       unsigned long&,
+       ::cuda::transform_iterator<
+         cuvs::distance::detail::Top1nnResultTraits<raft::KeyValuePair<int, float>*>::key_op,
+         raft::KeyValuePair<int, float>*>,
+       float*,
+       int,
+       int,
+       int,
+       int,
+       cudaStream_t);
+template cudaError_t cuvs::detail::histogram_even<
+  ::cuda::transform_iterator<
+    cuvs::distance::detail::Top1nnResultTraits<raft::KeyValuePair<long, double>*>::key_op,
+    raft::KeyValuePair<long, double>*>,
+  double,
+  long,
+  long>(void*,
+        unsigned long&,
+        ::cuda::transform_iterator<
+          cuvs::distance::detail::Top1nnResultTraits<raft::KeyValuePair<long, double>*>::key_op,
+          raft::KeyValuePair<long, double>*>,
+        double*,
+        int,
+        long,
+        long,
+        long,
+        cudaStream_t);
+template cudaError_t cuvs::detail::histogram_even<
+  ::cuda::transform_iterator<
+    cuvs::distance::detail::Top1nnResultTraits<raft::KeyValuePair<long, float>*>::key_op,
+    raft::KeyValuePair<long, float>*>,
+  float,
+  long,
+  long>(void*,
+        unsigned long&,
+        ::cuda::transform_iterator<
+          cuvs::distance::detail::Top1nnResultTraits<raft::KeyValuePair<long, float>*>::key_op,
+          raft::KeyValuePair<long, float>*>,
+        float*,
+        int,
+        long,
+        long,
+        long,
+        cudaStream_t);
+template cudaError_t cuvs::detail::histogram_even<int const*, double, int, int>(
+  void*, unsigned long&, int const*, double*, int, int, int, int, cudaStream_t);
+template cudaError_t cuvs::detail::histogram_even<int const*, float, int, int>(
+  void*, unsigned long&, int const*, float*, int, int, int, int, cudaStream_t);
+template cudaError_t cuvs::detail::histogram_even<int const*, int, int, int>(
+  void*, unsigned long&, int const*, int*, int, int, int, int, cudaStream_t);
+template cudaError_t cuvs::detail::histogram_even<int*, double, int, int>(
+  void*, unsigned long&, int*, double*, int, int, int, int, cudaStream_t);
+template cudaError_t cuvs::detail::histogram_even<int*, float, int, int>(
+  void*, unsigned long&, int*, float*, int, int, int, int, cudaStream_t);
+template cudaError_t cuvs::detail::histogram_even<int*, int, int, int>(
+  void*, unsigned long&, int*, int*, int, int, int, int, cudaStream_t);
+template cudaError_t cuvs::detail::histogram_even<long*, double, long, long>(
+  void*, unsigned long&, long*, double*, int, long, long, long, cudaStream_t);
+template cudaError_t cuvs::detail::histogram_even<long*, float, long, long>(
+  void*, unsigned long&, long*, float*, int, long, long, long, cudaStream_t);
+template cudaError_t cuvs::detail::histogram_even<unsigned int const*, unsigned int, int, long>(
+  void*, unsigned long&, unsigned int const*, unsigned int*, int, int, int, long, cudaStream_t);
+template cudaError_t
+cuvs::detail::histogram_even<unsigned int const*, unsigned long long, int, unsigned long>(
+  void*,
+  unsigned long&,
+  unsigned int const*,
+  unsigned long long*,
+  int,
+  int,
+  int,
+  unsigned long,
+  cudaStream_t);
 
 }  // namespace cuvs::detail
