@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../core/map.hpp"
 #include "common.cuh"
 #include "registers.hpp"
 #include <cuvs/neighbors/ball_cover.hpp>
@@ -53,12 +54,12 @@ void sample_landmarks(raft::resources const& handle,
   rmm::device_uvector<value_idx> R_indices(index.n_landmarks,
                                            raft::resource::get_cuda_stream(handle));
 
-  raft::linalg::map_offset(handle, index.get_R_1nn_cols(), raft::identity_op{});
+  cuvs::detail::map_offset(handle, index.get_R_1nn_cols(), raft::identity_op{});
 
-  raft::matrix::fill(
+  cuvs::detail::fill(
     handle, raft::make_device_vector_view(R_1nn_ones.data(), R_1nn_ones.size()), value_t(1.0));
 
-  raft::matrix::fill(
+  cuvs::detail::fill(
     handle, raft::make_device_vector_view(R_indices.data(), R_indices.size()), value_idx(0));
 
   /**
@@ -104,14 +105,14 @@ void construct_landmark_1nn(raft::resources const& handle,
 {
   auto R_1nn_inds = raft::make_device_vector<value_idx, value_idx>(handle, index.m);
 
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_idx>(R_1nn_inds.data_handle(), index.m),
                      std::numeric_limits<value_idx>::max());
 
-  raft::linalg::map_offset(handle, R_1nn_inds.view(), [R_knn_inds_ptr, k] __device__(value_idx i) {
+  cuvs::detail::map_offset(handle, R_1nn_inds.view(), [R_knn_inds_ptr, k] __device__(value_idx i) {
     return R_knn_inds_ptr[i * k];
   });
-  raft::linalg::map_offset(
+  cuvs::detail::map_offset(
     handle, index.get_R_1nn_dists(), [R_knn_dists_ptr, k] __device__(value_idx i) {
       return R_knn_dists_ptr[i * k];
     });
@@ -189,7 +190,7 @@ void compute_landmark_radii(raft::resources const& handle,
 {
   const value_idx* R_indptr_ptr  = index.get_R_indptr().data_handle();
   const value_t* R_1nn_dists_ptr = index.get_R_1nn_dists().data_handle();
-  raft::linalg::map_offset(
+  cuvs::detail::map_offset(
     handle, index.get_R_radius(), [R_indptr_ptr, R_1nn_dists_ptr] __device__(value_idx input) {
       value_idx last_row_idx = R_indptr_ptr[input + 1] - 1;
       return R_1nn_dists_ptr[last_row_idx];
@@ -220,10 +221,10 @@ void perform_rbc_query(raft::resources const& handle,
                        bool perform_post_filtering = true)
 {
   // initialize output inds and dists
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_idx>(inds, k * n_query_pts),
                      std::numeric_limits<value_idx>::max());
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_t>(dists, k * n_query_pts),
                      std::numeric_limits<value_t>::max());
 
@@ -253,7 +254,7 @@ void perform_rbc_eps_nn_query(raft::resources const& handle,
                               value_idx* vd)
 {
   // initialize output
-  raft::matrix::fill(
+  cuvs::detail::fill(
     handle, raft::make_device_vector_view(adj, index.m * n_query_pts), bool(false));
 
   raft::resource::sync_stream(handle);
@@ -303,10 +304,10 @@ void rbc_build_index(raft::resources const& handle,
   rmm::device_uvector<value_idx> R_knn_inds(index.m, raft::resource::get_cuda_stream(handle));
 
   // Initialize the uvectors
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_idx>(R_knn_inds.data(), R_knn_inds.size()),
                      std::numeric_limits<value_idx>::max());
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_t>(
                        index.get_R_closest_landmark_dists().data_handle(), index.m),
                      std::numeric_limits<value_t>::max());
@@ -365,17 +366,17 @@ void rbc_all_knn_query(raft::resources const& handle,
   rmm::device_uvector<value_t> R_knn_dists(k * index.m, raft::resource::get_cuda_stream(handle));
 
   // Initialize the uvectors
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_idx>(R_knn_inds.data(), R_knn_inds.size()),
                      std::numeric_limits<value_idx>::max());
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_t>(R_knn_dists.data(), R_knn_dists.size()),
                      std::numeric_limits<value_t>::max());
 
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_idx>(inds, k * index.m),
                      std::numeric_limits<value_idx>::max());
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_t>(dists, k * index.m),
                      std::numeric_limits<value_t>::max());
 
@@ -427,17 +428,17 @@ void rbc_knn_query(raft::resources const& handle,
                                            raft::resource::get_cuda_stream(handle));
 
   // Initialize the uvectors
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_idx>(R_knn_inds.data(), R_knn_inds.size()),
                      std::numeric_limits<value_idx>::max());
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_t>(R_knn_dists.data(), R_knn_dists.size()),
                      std::numeric_limits<value_t>::max());
 
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_idx>(inds, k * n_query_pts),
                      std::numeric_limits<value_idx>::max());
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<value_t>(dists, k * n_query_pts),
                      std::numeric_limits<value_t>::max());
 

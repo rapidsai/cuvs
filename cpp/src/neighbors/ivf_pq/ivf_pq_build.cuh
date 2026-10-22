@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../core/map.hpp"
 #include "../../core/nvtx.hpp"
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
@@ -157,7 +158,7 @@ void flat_compute_residuals(
   auto tmp_view = raft::make_device_vector_view<float, size_t>(tmp.data(), tmp.size());
 
   if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-    raft::linalg::map(
+    cuvs::detail::map(
       handle,
       tmp_view,
       raft::cast_op<float>{},
@@ -166,14 +167,14 @@ void flat_compute_residuals(
     raft::linalg::row_normalize<raft::linalg::L2Norm>(
       handle, raft::make_const_mdspan(tmp_matrix_view), tmp_matrix_view);
   } else {
-    raft::linalg::map_offset(
+    cuvs::detail::map_offset(
       handle,
       tmp_view,
       [dim] __device__(size_t i, T val) { return utils::mapping<float>{}(val); },
       raft::make_const_mdspan(raft::make_device_vector_view<const T, IdxT>(dataset, n_rows * dim)));
   }
 
-  raft::linalg::map_offset(
+  cuvs::detail::map_offset(
     handle,
     tmp_view,
     [centers, labels, dim] __device__(size_t i, float val) {
@@ -312,7 +313,7 @@ void transpose_pq_centers(const raft::resources& handle,
     pq_centers_source, extents_source);
   auto pq_centers_view = raft::make_device_vector_view<float, IdxT>(
     impl->pq_centers().data_handle(), impl->pq_centers().size());
-  raft::linalg::map_offset(handle, pq_centers_view, [span_source, extents] __device__(size_t i) {
+  cuvs::detail::map_offset(handle, pq_centers_view, [span_source, extents] __device__(size_t i) {
     uint32_t ii[3];
     for (int r = 2; r > 0; r--) {
       ii[r] = i % extents.extent(r);
@@ -669,7 +670,7 @@ void reconstruct_list_data(raft::resources const& res,
                      raft::resource::get_cuda_stream(res).get());
   // Transform the data to the original type, if necessary
   if constexpr (!std::is_same_v<T, float>) {
-    raft::linalg::map(
+    cuvs::detail::map(
       res,
       out_vectors,
       utils::mapping<T>{},
@@ -1161,7 +1162,7 @@ void extend(raft::resources const& handle,
                                          n_rows,
                                          1,
                                          stream.get());
-  raft::linalg::add(
+  cuvs::detail::add(
     handle,
     raft::make_device_vector_view<const uint32_t>(list_sizes, n_clusters),
     raft::make_device_vector_view<const uint32_t>(orig_list_sizes.data(), n_clusters),
@@ -1327,7 +1328,7 @@ auto build(raft::resources const& handle,
 
       raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset_tmp.view());
 
-      raft::linalg::map(handle,
+      cuvs::detail::map(handle,
                         raft::make_device_vector_view<float, int64_t>(trainset.data_handle(),
                                                                       (int64_t)trainset.size()),
                         utils::mapping<float>{},

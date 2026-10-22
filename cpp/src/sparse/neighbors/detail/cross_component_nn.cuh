@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include "../../../core/map.hpp"
 #include "../../../distance/masked_nn.cuh"
 #include <cuvs/distance/distance.hpp>
 
@@ -297,7 +298,7 @@ void perform_1nn(raft::resources const& handle,
   auto exec_policy = raft::resource::get_thrust_policy(handle);
 
   auto sort_plan = raft::make_device_vector<value_idx>(handle, (value_idx)n_rows);
-  raft::linalg::map_offset(handle, sort_plan.view(), [] __device__(value_idx idx) { return idx; });
+  cuvs::detail::map_offset(handle, sort_plan.view(), [] __device__(value_idx idx) { return idx; });
 
   thrust::sort_by_key(
     raft::resource::get_thrust_policy(handle), colors, colors + n_rows, sort_plan.data_handle());
@@ -364,7 +365,7 @@ void perform_1nn(raft::resources const& handle,
     auto adj_vector_view = raft::make_device_vector_view<bool, value_idx>(
       adj.data_handle(), rows_per_batch * n_components);
 
-    raft::linalg::map_offset(handle, adj_vector_view, mask_op);
+    cuvs::detail::map_offset(handle, adj_vector_view, mask_op);
 
     auto adj_view = raft::make_device_matrix_view<const bool, value_idx>(
       adj.data_handle(), rows_per_batch, n_components);
@@ -385,7 +386,7 @@ void perform_1nn(raft::resources const& handle,
   }
 
   // Transform the keys so that they correctly point to the unpermuted indices.
-  raft::linalg::map(
+  cuvs::detail::map(
     handle,
     raft::make_device_vector_view<OutT, value_idx>(kvp, (value_idx)n_rows),
     [sort_plan = sort_plan.data_handle()] __device__(OutT KVP) {
@@ -414,7 +415,7 @@ void perform_1nn(raft::resources const& handle,
   raft::copy_async(kvp, tmp_kvp.data_handle(), n_rows, stream);
 
   LookupColorOp<value_idx, value_t> extract_colors_op(colors);
-  raft::linalg::map(
+  cuvs::detail::map(
     handle,
     raft::make_device_vector_view<value_idx, value_idx>(nn_colors, (value_idx)n_rows),
     extract_colors_op,

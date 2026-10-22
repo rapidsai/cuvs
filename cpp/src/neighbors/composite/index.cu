@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "../../core/map.hpp"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/composite/index.hpp>
@@ -80,7 +81,7 @@ void composite_index<T, IdxT, OutputIdxT>::search(
                                    filter);
 
     if (offset != 0) {
-      raft::linalg::addScalar(temp_neighbors[i].data(),
+      cuvs::detail::addScalar(temp_neighbors[i].data(),
                               temp_neighbors[i].data(),
                               offset,
                               temp_neighbors[i].size(),

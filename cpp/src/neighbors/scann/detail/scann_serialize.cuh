@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/map.hpp"
 #include <cuvs/neighbors/scann.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/mdarray.hpp>
@@ -55,7 +56,7 @@ void save_labels(raft::resources const& res,
 {
   auto combined_labels = raft::make_device_vector<int, IdxT>(res, 2 * labels_view.extent(0));
 
-  raft::linalg::map_offset(
+  cuvs::detail::map_offset(
     res, combined_labels.view(), [labels_view, soar_labels_view] __device__(size_t i) {
       size_t label_type = i % 2;
       size_t idx        = i / 2;

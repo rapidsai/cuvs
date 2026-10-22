@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "../../core/map.hpp"
 #include <cuvs/preprocessing/quantize/bbq.hpp>
 #include <optional>
 #include <raft/core/device_mdarray.hpp>
@@ -31,7 +32,7 @@ void resolve_dequant_factors(
                "resolve_dequant_factors: all vectors must have the same length");
   const float scale = 1.0f / static_cast<float>((uint32_t{1} << get_bit_width(layout)) - 1);
   auto* sum_delta   = dequant_sum_delta.data_handle();
-  raft::linalg::map_offset(res,
+  cuvs::detail::map_offset(res,
                            dequant_delta,
                            [scale,
                             sum_delta,

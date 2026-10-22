@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../core/map.hpp"
 #include "../../core/nvtx.hpp"
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
@@ -341,7 +342,7 @@ void extend_inplace(raft::resources const& handle,
                                             n_rows,
                                             1,
                                             stream.get());
-  raft::linalg::add(
+  cuvs::detail::add(
     list_sizes_ptr, list_sizes_ptr, old_list_sizes_dev.data_handle(), n_lists, stream.get());
 
   std::vector<uint32_t> new_list_sizes(n_lists);
@@ -518,7 +519,7 @@ inline auto build(
       // since the SQ parameters are trained on a subset rather than the full dataset.
       constexpr float kMargin = 0.05f;
       auto* delta_ptr         = idx.sq_delta().data_handle();
-      raft::linalg::map_offset(
+      cuvs::detail::map_offset(
         handle, idx.sq_vmin(), [vmin_ptr, vmax_ptr, delta_ptr, kMargin] __device__(uint32_t j) {
           float range  = vmax_ptr[j] - vmin_ptr[j];
           float margin = range * kMargin;

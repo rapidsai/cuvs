@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../core/map.hpp"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/knn_merge_parts.hpp>
@@ -163,12 +164,12 @@ void tiled_brute_force_knn(const raft::resources& handle,
   // if we have less than k items in the index, we should fill out the result
   // to indicate that we are missing items (and match behaviour in faiss)
   if (n < k) {
-    raft::matrix::fill(handle,
+    cuvs::detail::fill(handle,
                        raft::make_device_matrix_view(distances, m, k),
                        std::numeric_limits<DistanceT>::lowest());
 
     if constexpr (std::is_signed_v<IndexType>) {
-      raft::matrix::fill(handle, raft::make_device_matrix_view(indices, m, k), IndexType{-1});
+      cuvs::detail::fill(handle, raft::make_device_matrix_view(indices, m, k), IndexType{-1});
     }
   }
 
@@ -204,7 +205,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
         auto dist      = temp_distances.data();
         bool sqrt      = metric == cuvs::distance::DistanceType::L2SqrtExpanded;
 
-        raft::linalg::map_offset(
+        cuvs::detail::map_offset(
           handle,
           raft::make_device_vector_view(dist, current_query_size * current_centroid_size),
           [=] __device__(IndexType idx) {
@@ -220,7 +221,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
         auto col_norms = precomputed_index_norms ? precomputed_index_norms : index_norms.data();
         auto dist      = temp_distances.data();
 
-        raft::linalg::map_offset(
+        cuvs::detail::map_offset(
           handle,
           raft::make_device_vector_view(dist, current_query_size * current_centroid_size),
           [=] __device__(IndexType idx) {
@@ -233,7 +234,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
         // if we're not l2 distance, and we have a distance epilogue - run it now
         if constexpr (!std::is_same_v<DistanceEpilogue, raft::identity_op>) {
           auto distances_ptr = temp_distances.data();
-          raft::linalg::map_offset(
+          cuvs::detail::map_offset(
             handle,
             raft::make_device_vector_view(temp_distances.data(),
                                           current_query_size * current_centroid_size),
@@ -478,7 +479,7 @@ void brute_force_knn_impl(
         if (metric == cuvs::distance::DistanceType::LpUnexpanded) p = 1.0 / metricArg;
         raft::resources stream_handle(handle);
         raft::resource::set_cuda_stream(stream_handle, stream);
-        raft::linalg::map(
+        cuvs::detail::map(
           stream_handle,
           raft::make_device_vector_view<DistType, int64_t>(res_D, n * k),
           [p] __device__(DistType input) { return powf(fabsf(input), p); },

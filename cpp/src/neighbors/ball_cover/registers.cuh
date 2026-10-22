@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../core/map.hpp"
 #include "../detail/haversine_distance.cuh"
 #include "common.cuh"
 #include "registers.hpp"
@@ -1134,7 +1135,7 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
 
   rmm::device_uvector<std::uint32_t> bitset(bitset_size * n_query_rows,
                                             raft::resource::get_cuda_stream(handle));
-  raft::matrix::fill(handle,
+  cuvs::detail::fill(handle,
                      raft::make_device_vector_view<std::uint32_t>(bitset.data(), bitset.size()),
                      std::uint32_t(0));
 
@@ -1454,7 +1455,7 @@ void rbc_eps_pass(raft::resources const& handle,
 
     if (actual_max > max_k_in) {
       // ceil vd to max_k
-      raft::linalg::map(handle,
+      cuvs::detail::map(handle,
                         raft::make_device_vector_view<const value_idx>(vd_ptr, n_query_rows),
                         raft::make_device_vector_view<value_idx>(vd_ptr, n_query_rows),
                         [max_k_in] __device__(value_idx vd_count) {

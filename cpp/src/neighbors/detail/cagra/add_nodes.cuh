@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
+#include "../../../core/map.hpp"
 #include "../../../core/omp_wrapper.hpp"
 #include "../ann_utils.cuh"
 #include <cuvs/neighbors/cagra.hpp>
@@ -40,7 +41,7 @@ void add_node_core(
   // Step 0: Calculate the number of incoming edges for each node
   auto dev_num_incoming_edges = raft::make_device_vector<int, std::uint64_t>(handle, new_size);
 
-  raft::matrix::fill(handle, dev_num_incoming_edges.view(), int(0));
+  cuvs::detail::fill(handle, dev_num_incoming_edges.view(), int(0));
   raft::stats::histogram<IdxT, std::int64_t>(raft::stats::HistTypeAuto,
                                              dev_num_incoming_edges.data_handle(),
                                              old_size,

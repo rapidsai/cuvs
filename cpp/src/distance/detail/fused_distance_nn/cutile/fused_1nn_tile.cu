@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "../../../../core/map.hpp"
 #include "fused_1nn_tile.hpp"
 
 #include "fused_1nn_planner.hpp"
@@ -416,7 +417,7 @@ void launch_fused_1nn_tile(raft::resources const& handle,
       }
 
       if (nearest_idx != nullptr) {
-        raft::linalg::unaryOp(
+        cuvs::detail::unaryOp(
           nearest_idx + offset, tmp_idx, batch_m, raft::cast_op<int64_t>{}, stream.get());
       }
       offset += batch_m64;

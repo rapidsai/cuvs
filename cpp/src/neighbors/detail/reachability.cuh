@@ -4,6 +4,7 @@
  */
 
 #pragma once
+#include "../../core/map.hpp"
 #include "./knn_brute_force.cuh"
 
 #include <raft/core/resource/cuda_stream.hpp>
@@ -44,7 +45,7 @@ void core_distances(raft::resources const& handle,
 
   auto out_view = raft::make_device_vector_view<value_t, value_idx>(out, n);
 
-  raft::linalg::map_offset(handle, out_view, [=] __device__(value_idx row) {
+  cuvs::detail::map_offset(handle, out_view, [=] __device__(value_idx row) {
     return knn_dists[row * n_neighbors + (min_samples - 1)];
   });
 }
@@ -210,7 +211,7 @@ void mutual_reachability_graph(const raft::resources& handle,
   // self-loops get max distance
   auto coo_rows_view =
     raft::make_device_vector_view<value_idx, value_idx>(coo_rows.data(), m * min_samples);
-  raft::linalg::map_offset(
+  cuvs::detail::map_offset(
     handle, coo_rows_view, [min_samples] __device__(value_idx c) -> value_idx {
       return c / min_samples;
     });
@@ -232,7 +233,7 @@ void mutual_reachability_graph(const raft::resources& handle,
   auto vals_in_view  = raft::make_device_vector_view<const value_t, nnz_t>(out.vals(), out.nnz);
   auto vals_out_view = raft::make_device_vector_view<value_t, nnz_t>(out.vals(), out.nnz);
 
-  raft::linalg::map(
+  cuvs::detail::map(
     handle,
     vals_out_view,
     [=] __device__(const value_idx row, const value_idx col, const value_t val) {

@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/map.hpp"
 #include <cuvs/preprocessing/quantize/scalar.hpp>
 #include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
@@ -168,7 +169,7 @@ void transform(raft::resources const& res,
                raft::device_matrix_view<const T, int64_t> dataset,
                raft::device_matrix_view<QuantI, int64_t> out)
 {
-  raft::linalg::map(res,
+  cuvs::detail::map(res,
                     out,
                     quantize_op<T, QuantI>(quantizer.min_, quantizer.max_),
                     raft::make_const_mdspan(dataset));
@@ -198,7 +199,7 @@ void inverse_transform(raft::resources const& res,
                        raft::device_matrix_view<const QuantI, int64_t> dataset,
                        raft::device_matrix_view<T, int64_t> out)
 {
-  raft::linalg::map(res,
+  cuvs::detail::map(res,
                     out,
                     quantize_op<T, QuantI>(quantizer.min_, quantizer.max_),
                     raft::make_const_mdspan(dataset));

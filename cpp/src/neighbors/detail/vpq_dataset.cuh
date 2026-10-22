@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include "../../core/map.hpp"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/preprocessing/quantize/pq.hpp>
 
@@ -156,7 +157,7 @@ auto transform_data(const raft::resources& res, DatasetT dataset)
 
   auto result = raft::make_device_mdarray<T, index_type, layout_type>(res, dataset.extents());
 
-  raft::linalg::map(res,
+  cuvs::detail::map(res,
                     result.view(),
                     cuvs::spatial::knn::detail::utils::mapping<T>{},
                     raft::make_const_mdspan(dataset.view()));
@@ -251,7 +252,7 @@ auto train_pq(const raft::resources& res,
     auto vq_labels = raft::make_device_vector<uint32_t, ix_t>(res, pq_trainset.extent(0));
     predict_vq<uint32_t>(res, pq_trainset, vq_centers, vq_labels.view());
     using index_type = typename DatasetT::index_type;
-    raft::linalg::map_offset(
+    cuvs::detail::map_offset(
       res,
       pq_trainset.view(),
       [labels = vq_labels.view(), centers = vq_centers, dim] __device__(index_type off, MathT x) {

@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../core/map.hpp"
 #include "../../neighbors/detail/knn_graph.cuh"
 #include "./kmeans_common.cuh"
 #include <cuvs/cluster/agglomerative.hpp>
@@ -80,7 +81,7 @@ struct distance_graph_impl<Linkage::KNN_GRAPH, value_idx, value_t> {
     auto vals_out_view =
       raft::make_device_vector_view<value_t, value_idx>(knn_graph_coo.vals(), knn_graph_coo.nnz);
 
-    raft::linalg::map(
+    cuvs::detail::map(
       handle,
       vals_out_view,
       [=] __device__(const value_idx row, const value_idx col, const value_t val) {
@@ -142,7 +143,7 @@ void pairwise_distances(const raft::resources& handle,
   value_idx blocks = raft::ceildiv(nnz, (value_idx)256);
   fill_indices2<value_idx><<<blocks, 256, 0, stream.get()>>>(indices, m, nnz);
 
-  raft::linalg::map_offset(handle,
+  cuvs::detail::map_offset(handle,
                            raft::make_device_vector_view<value_idx, value_idx>(indptr, m),
                            [=] __device__(value_idx idx) { return idx * m; });
 
@@ -159,7 +160,7 @@ void pairwise_distances(const raft::resources& handle,
   // self-loops get max distance
   auto data_view = raft::make_device_vector_view<value_t, value_idx>(data, nnz);
 
-  raft::linalg::map_offset(
+  cuvs::detail::map_offset(
     handle,
     data_view,
     [=] __device__(value_idx idx, value_t val) {

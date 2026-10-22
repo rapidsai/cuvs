@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/map.hpp"
 #include "../../detail/ann_utils.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/scann.hpp>
@@ -439,7 +440,7 @@ index<T, IdxT> build(
   // with open-source ScaNN search
   auto full_codebook_view = pq_quantizer.vpq_codebooks.pq_code_book.view();
 
-  raft::linalg::map_offset(
+  cuvs::detail::map_offset(
     res,
     idx.pq_codebook(),
     [full_codebook_view, num_subspaces, dim_per_subspace, num_clusters] __device__(size_t i) {

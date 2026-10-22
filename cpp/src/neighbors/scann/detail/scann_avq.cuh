@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "../../../core/map.hpp"
 #include <cub/device/device_histogram.cuh>
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_scan.cuh>
@@ -336,7 +337,7 @@ void rescale_avq_centroids(raft::resources const& dev_resources,
 
   sum_reduce_vector(dev_resources, rescale_num_v, rescale_num.view());
 
-  raft::linalg::map_offset(
+  cuvs::detail::map_offset(
     dev_resources,
     rescale_denom_v,
     [cluster_sizes, dataset_size] __device__(size_t i, float x) {
@@ -353,7 +354,7 @@ void rescale_avq_centroids(raft::resources const& dev_resources,
   auto rescale_num_ptr   = rescale_num.data_handle();
   auto rescale_denom_ptr = rescale_denom.data_handle();
 
-  raft::linalg::map_offset(
+  cuvs::detail::map_offset(
     dev_resources,
     centroids,
     [rescale_num_ptr, rescale_denom_ptr] __device__(size_t i, float x) {

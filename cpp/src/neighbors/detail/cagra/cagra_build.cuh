@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include "../../../core/map.hpp"
 #include "../../../core/nvtx.hpp"
 #include "../../../util/kvikio_io.hpp"
 #include "../../ivf_pq/ivf_pq_fp16_overflow.cuh"
@@ -786,7 +787,7 @@ auto iterative_build_graph(raft::resources const& res,
       raft::make_device_matrix<T, int64_t>(res, chunk_i64, query_stride_i64));
     // Padding columns must be zero: search_main cosine post-process reduces over the full row
     // width, and reconstruct only writes the logical dim.
-    raft::matrix::fill(res, reconstructed_batch_queries->view(), T(0));
+    cuvs::detail::fill(res, reconstructed_batch_queries->view(), T(0));
   }
 
   // Determine graph degree and number of search results while increasing

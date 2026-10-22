@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/map.hpp"
 #include "../../../core/nvtx.hpp"
 #include "../../../neighbors/detail/vpq_dataset.cuh"
 #include "pq_codepacking.cuh"  // pq_bits-bitfield
@@ -100,7 +101,7 @@ auto train_pq_subspaces(
     auto vq_labels = raft::make_device_vector<uint32_t, ix_t>(res, pq_trainset.extent(0));
     cuvs::neighbors::detail::predict_vq<uint32_t>(
       res, raft::make_const_mdspan(pq_trainset.view()), vq_centers, vq_labels.view());
-    raft::linalg::map_offset(
+    cuvs::detail::map_offset(
       res,
       pq_trainset.view(),
       [labels = vq_labels.view(), vq_centers, dim] __device__(ix_t off, MathT x) {
@@ -372,11 +373,11 @@ void vpq_convert_math_type(const raft::resources& res,
                            const cuvs::neighbors::device_vpq_dataset<OldMathT, IdxT>& src,
                            cuvs::neighbors::device_vpq_dataset<NewMathT, IdxT>& dst)
 {
-  raft::linalg::map(res,
+  cuvs::detail::map(res,
                     dst.vq_code_book.view(),
                     cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
                     raft::make_const_mdspan(src.vq_code_book.view()));
-  raft::linalg::map(res,
+  cuvs::detail::map(res,
                     dst.pq_code_book.view(),
                     cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
                     raft::make_const_mdspan(src.pq_code_book.view()));

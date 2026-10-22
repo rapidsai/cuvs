@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "../../../core/map.hpp"
 #include <chrono>
 #include <cmath>
 #include <cuvs/neighbors/common.hpp>
@@ -44,7 +45,7 @@ auto compute_residuals(raft::resources const& res,
   auto residuals = raft::make_device_matrix<T, int64_t>(res, labels.extent(0), dim);
 
   // compute residuals for AVQ assignments
-  raft::linalg::map_offset(
+  cuvs::detail::map_offset(
     res, residuals.view(), [dataset, centers, labels, dim] __device__(size_t i) {
       int row_idx = i / dim;
       int el_idx  = i % dim;
@@ -78,7 +79,7 @@ void unpack_codes(raft::resources const& res,
                   int num_subspaces)
 {
   if (pq_bits == 4) {
-    raft::linalg::map_offset(
+    cuvs::detail::map_offset(
       res, unpacked_codes_view, [codes_view, num_subspaces] __device__(size_t i) {
         int64_t row_idx             = i / num_subspaces;
         int64_t subspace_idx        = i % num_subspaces;
@@ -327,7 +328,7 @@ void quantize_bfloat16(raft::resources const& res,
   if (!std::isnan(noise_shaping_threshold)) {
     quantize_bfloat16_noise_shaped(res, dataset, bf16_dataset, noise_shaping_threshold);
   } else {
-    raft::linalg::map(
+    cuvs::detail::map(
       res,
       raft::make_device_vector_view<int16_t, int64_t>(bf16_dataset.data_handle(),
                                                       (int64_t)bf16_dataset.size()),

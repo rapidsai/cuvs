@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/map.hpp"
 #include "common.hpp"
 #include "ip_distance.cuh"
 #include <cuvs/distance/distance.hpp>
@@ -278,7 +279,7 @@ class l2_sqrt_expanded_distances_t : public l2_expanded_distances_t<value_idx, v
     l2_expanded_distances_t<value_idx, value_t>::compute(out_dists);
     // Sqrt Post-processing
     uint64_t n = (uint64_t)this->config_->a_nrows * this->config_->b_nrows;
-    raft::linalg::map(
+    cuvs::detail::map(
       this->config_->handle,
       raft::make_device_vector_view<value_t, int64_t>(out_dists, n),
       [] __device__(value_t input) {
@@ -430,7 +431,7 @@ class hellinger_expanded_distances_t : public distances_t<value_t> {
       raft::atomic_add_op());
 
     uint64_t n = (uint64_t)config_->a_nrows * config_->b_nrows;
-    raft::linalg::map(
+    cuvs::detail::map(
       config_->handle,
       raft::make_device_vector_view<value_t, int64_t>(out_dists, n),
       [=] __device__(value_t input) {
@@ -465,7 +466,7 @@ class russelrao_expanded_distances_t : public distances_t<value_t> {
     value_t n_cols     = config_->a_ncols;
     value_t n_cols_inv = 1.0 / n_cols;
     uint64_t n         = (uint64_t)config_->a_nrows * config_->b_nrows;
-    raft::linalg::map(
+    cuvs::detail::map(
       config_->handle,
       raft::make_device_vector_view<value_t, int64_t>(out_dists, n),
       [=] __device__(value_t input) { return (n_cols - input) * n_cols_inv; },

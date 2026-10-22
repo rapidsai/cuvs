@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/map.hpp"
 #include <cuvs/preprocessing/quantize/binary.hpp>
 #include <raft/core/copy.cuh>
 #include <raft/core/device_mdspan.hpp>
@@ -149,7 +150,7 @@ void mean_f16_in_f32(raft::resources const& res,
   auto mr = raft::resource::get_workspace_resource_ref(res);
   auto f32_result_vec =
     raft::make_device_mdarray<float, int64_t>(res, mr, raft::make_extents<int64_t>(dataset_dim));
-  raft::matrix::fill(res, f32_result_vec.view(), float(0));
+  cuvs::detail::fill(res, f32_result_vec.view(), float(0));
 
   constexpr uint32_t dataset_size_per_cta = 2048;
   constexpr uint32_t block_size           = 256;
@@ -338,7 +339,7 @@ auto train(raft::resources const& res,
                casted_vec.view(),
                raft::make_host_vector_view<const compute_t>(host_threshold_vec.data(),
                                                             (int64_t)dataset_dim));
-    raft::linalg::map(res,
+    cuvs::detail::map(res,
                       quantizer.threshold.view(),
                       raft::cast_op<T>{},
                       raft::make_const_mdspan(casted_vec.view()));
@@ -428,7 +429,7 @@ void transform(raft::resources const& res,
       auto mr         = raft::resource::get_workspace_resource_ref(res);
       auto casted_vec = raft::make_device_mdarray<float, int64_t>(
         res, mr, raft::make_extents<int64_t>(dataset_dim));
-      raft::linalg::map(res,
+      cuvs::detail::map(res,
                         casted_vec.view(),
                         raft::cast_op<compute_t>{},
                         raft::make_const_mdspan(quantizer.threshold.view()));

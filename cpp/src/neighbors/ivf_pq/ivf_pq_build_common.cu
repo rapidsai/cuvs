@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "../../core/map.hpp"
 #include "../../core/nvtx.hpp"
 #include "ivf_pq_build.cuh"
 #include <cuvs/distance/distance.hpp>
@@ -254,7 +255,7 @@ void make_rotation_matrix(raft::resources const& handle,
     uint32_t stride = n + 1;
     auto rotation_matrix_view =
       raft::make_device_vector_view<float, uint32_t>(rotation_matrix, n * n);
-    raft::linalg::map_offset(handle, rotation_matrix_view, [stride] __device__(uint32_t i) {
+    cuvs::detail::map_offset(handle, rotation_matrix_view, [stride] __device__(uint32_t i) {
       return static_cast<float>(i % stride == 0u);
     });
   }

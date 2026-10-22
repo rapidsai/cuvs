@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "../core/map.hpp"
 #include "detail/fused_distance_nn.cuh"
 #include "fused_distance_nn_helpers.cuh"
 #include "top_1_nn.cuh"
@@ -561,7 +562,7 @@ void top_1_nn_unfused(raft::resources const& handle,
         if (candidate_offset != 0) {
           auto candidate_output =
             raft::make_device_vector_view<const NativeOutputT, IdxT>(candidate_min, rows);
-          raft::linalg::map(
+          cuvs::detail::map(
             handle,
             row_output,
             [candidate_offset] __device__(NativeOutputT current, NativeOutputT candidate) {

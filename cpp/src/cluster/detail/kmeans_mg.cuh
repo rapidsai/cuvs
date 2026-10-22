@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include "../../core/map.hpp"
 #include "../kmeans.cuh"
 #include "kmeans.cuh"
 #include "kmeans_batch_loader.cuh"
@@ -240,7 +241,7 @@ void mnmg_fit(
 
       auto d_part_wt = raft::make_device_scalar<DataT>(dev_res, DataT{0});
       cuvs::cluster::kmeans::detail::weightSum(dev_res, weights, d_part_wt.view(), false);
-      raft::linalg::add(d_wt.data_handle(), d_wt.data_handle(), d_part_wt.data_handle(), 1, stream);
+      cuvs::detail::add(d_wt.data_handle(), d_wt.data_handle(), d_part_wt.data_handle(), 1, stream);
     }
 
     comms.allreduce(d_wt.data_handle(), d_wt.data_handle(), 1);
@@ -256,7 +257,7 @@ void mnmg_fit(
 
     const IndexT* d_global_n_ptr = d_global_n.data_handle();
     const DataT* d_wt_ptr        = d_wt.data_handle();
-    raft::linalg::map(
+    cuvs::detail::map(
       dev_res,
       d_weight_scale.view(),
       [d_global_n_ptr, d_wt_ptr] __device__(DataT) {
@@ -324,7 +325,7 @@ void mnmg_fit(
           (*sample_weight_parts)[p].data_handle(), part_rows);
         auto dst = raft::make_device_vector_view<DataT, IndexT>(
           d_scaled_weights.data_handle() + part_offsets[p], part_rows);
-        raft::linalg::map(
+        cuvs::detail::map(
           dev_res,
           dst,
           [d_weight_scale_ptr] __device__(DataT w) { return w * (*d_weight_scale_ptr); },
@@ -438,7 +439,7 @@ void mnmg_fit(
         raft::copy(batch_weights.data_handle(), staged_weights, cur_batch_size, stream);
         auto batch_weights_mut =
           raft::make_device_vector_view<DataT, IndexT>(batch_weights.data_handle(), cur_batch_size);
-        raft::linalg::map(
+        cuvs::detail::map(
           dev_res,
           batch_weights_mut,
           [d_weight_scale_ptr] __device__(DataT w) { return w * (*d_weight_scale_ptr); },
@@ -471,9 +472,9 @@ void mnmg_fit(
                                                            rank,
                                                            comms);
 
-    if (!sample_weights) { raft::matrix::fill(dev_res, batch_weights.view(), DataT{1}); }
+    if (!sample_weights) { cuvs::detail::fill(dev_res, batch_weights.view(), DataT{1}); }
 
-    raft::matrix::fill(dev_res, d_prior_cost.view(), DataT{0});
+    cuvs::detail::fill(dev_res, d_prior_cost.view(), DataT{0});
     *h_done_flag.data_handle() = 0;
 
     for (local_n_iter = 1; local_n_iter <= iter_params.max_iter; ++local_n_iter) {
@@ -490,9 +491,9 @@ void mnmg_fit(
 
       RAFT_LOG_DEBUG("MNMG KMeans: iteration %d on rank %d", local_n_iter, rank);
 
-      raft::matrix::fill(dev_res, centroid_sums.view(), DataT{0});
-      raft::matrix::fill(dev_res, weight_per_cluster.view(), DataT{0});
-      raft::matrix::fill(dev_res, clustering_cost.view(), DataT{0});
+      cuvs::detail::fill(dev_res, centroid_sums.view(), DataT{0});
+      cuvs::detail::fill(dev_res, weight_per_cluster.view(), DataT{0});
+      cuvs::detail::fill(dev_res, clustering_cost.view(), DataT{0});
 
       data_batches.start();
       if (weight_batches.has_value()) { weight_batches->start(); }
@@ -618,7 +619,7 @@ void mnmg_fit(
       DataT tol        = static_cast<DataT>(params.tol);
       int iter         = static_cast<int>(local_n_iter);
 
-      raft::linalg::map_offset(
+      cuvs::detail::map_offset(
         dev_res,
         raft::make_device_vector_view<int, int>(d_done_flag.data_handle(), 1),
         [=] __device__(int) {
@@ -633,7 +634,7 @@ void mnmg_fit(
     }
     local_n_iter = std::min(local_n_iter, static_cast<IndexT>(iter_params.max_iter));
 
-    raft::matrix::fill(dev_res, clustering_cost.view(), DataT{0});
+    cuvs::detail::fill(dev_res, clustering_cost.view(), DataT{0});
 
     data_batches.start();
     if (weight_batches.has_value()) { weight_batches->start(); }
@@ -693,7 +694,7 @@ void mnmg_fit(
                                                   iter_params.batch_samples,
                                                   iter_params.batch_centroids,
                                                   batch_sw);
-      raft::linalg::add(clustering_cost.data_handle(),
+      cuvs::detail::add(clustering_cost.data_handle(),
                         clustering_cost.data_handle(),
                         batch_cost.data_handle(),
                         1,

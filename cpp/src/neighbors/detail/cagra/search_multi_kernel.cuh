@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include "../../../core/map.hpp"
 #include "search_multi_kernel_launcher_jit.cuh"
 
 #include "set_value_batch.cuh"
@@ -674,7 +675,7 @@ struct search
     if (source_indices_ptr != nullptr) {
       auto buf_result_indices = raft::make_device_matrix_view<const INDEX_T, int64_t>(
         result_indices_ptr, num_queries, result_buffer_allocation_size);
-      raft::linalg::map_offset(
+      cuvs::detail::map_offset(
         res,
         raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
         [source_indices_ptr, buf_result_indices, topk] __device__(auto offset) {

@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../core/map.hpp"
 #include "../../core/nvtx.hpp"
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
@@ -258,7 +259,7 @@ void extend(raft::resources const& handle,
                                            n_rows,
                                            1,
                                            stream.get());
-    raft::linalg::add(handle,
+    cuvs::detail::add(handle,
                       raft::make_device_vector_view<const uint32_t, IdxT>(list_sizes_ptr, n_lists),
                       raft::make_device_vector_view<const uint32_t, IdxT>(
                         old_list_sizes_dev.data_handle(), n_lists),
@@ -475,7 +476,7 @@ inline void fill_refinement_index(raft::resources const& handle,
     n_queries * n_candidates, stream, raft::resource::get_workspace_resource_ref(handle));
   auto new_labels_view =
     raft::make_device_vector_view<LabelT, IdxT>(new_labels.data(), n_queries * n_candidates);
-  raft::linalg::map_offset(
+  cuvs::detail::map_offset(
     handle,
     new_labels_view,
     raft::compose_op(raft::cast_op<LabelT>(), raft::div_const_op<IdxT>(n_candidates)));
@@ -492,7 +493,7 @@ inline void fill_refinement_index(raft::resources const& handle,
   // Update the pointers and the sizes
   ivf::detail::recompute_internal_state(handle, *refinement_index);
 
-  raft::matrix::fill(handle, raft::make_device_vector_view(list_sizes_ptr, n_lists), uint32_t(0));
+  cuvs::detail::fill(handle, raft::make_device_vector_view(list_sizes_ptr, n_lists), uint32_t(0));
 
   const dim3 block_dim(256);
   const dim3 grid_dim(raft::ceildiv<IdxT>(n_queries * n_candidates, block_dim.x));

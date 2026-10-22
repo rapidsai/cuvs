@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/map.hpp"
 #include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/preprocessing/spectral_embedding.hpp>
 
@@ -42,7 +43,7 @@ OutSparseMatrixType create_laplacian(raft::resources const& handle,
   auto laplacian_elements_view = raft::make_device_vector_view<DataT>(
     laplacian.get_elements().data(), laplacian.structure_view().get_nnz());
 
-  raft::linalg::map(
+  cuvs::detail::map(
     handle,
     laplacian_elements_view,
     [] __device__(DataT x) { return -x; },
@@ -91,7 +92,7 @@ void compute_eigenpairs(raft::resources const& handle,
     spectral_embedding_config.drop_first ? config.n_components - 1 : config.n_components;
   auto col_indices = raft::make_device_vector<int>(handle, config.n_components);
 
-  raft::linalg::map_offset(handle,
+  cuvs::detail::map_offset(handle,
                            col_indices.view(),
                            [n = config.n_components] __device__(int idx) { return n - 1 - idx; });
 
@@ -161,18 +162,18 @@ void create_connectivity_graph(
   auto knn_rows = raft::make_device_vector<int, NNZType>(handle, nnz);
   auto knn_cols = raft::make_device_vector<int, NNZType>(handle, nnz);
 
-  raft::linalg::map(
+  cuvs::detail::map(
     handle,
     knn_cols.view(),
     [] __device__(int64_t x) { return static_cast<int>(x); },
     raft::make_const_mdspan(d_indices.view()));
 
-  raft::linalg::map_offset(handle, knn_rows.view(), [k_search] __device__(NNZType idx) -> int {
+  cuvs::detail::map_offset(handle, knn_rows.view(), [k_search] __device__(NNZType idx) -> int {
     return static_cast<int>(idx / k_search);
   });
 
   // set all distances to 1.0f (connectivity KNN graph)
-  raft::matrix::fill(
+  cuvs::detail::fill(
     handle, raft::make_device_vector_view<float, NNZType>(d_distances.data_handle(), nnz), 1.0f);
 
   auto coo_matrix_view = raft::make_device_coo_matrix_view<const float, int, int, NNZType>(

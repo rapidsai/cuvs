@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../core/map.hpp"
 #include <raft/core/copy.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -252,7 +253,7 @@ void extract_flattened_clusters(raft::resources const& handle,
 
   // Handle special case where n_clusters == 1
   if (n_clusters == 1) {
-    raft::matrix::fill(
+    cuvs::detail::fill(
       handle, raft::make_device_vector_view<value_idx>(labels, n_leaves), value_idx(0));
   } else {
     /**

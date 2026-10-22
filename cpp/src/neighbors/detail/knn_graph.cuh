@@ -4,6 +4,7 @@
  */
 
 #pragma once
+#include "../../core/map.hpp"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/all_neighbors.hpp>
 
@@ -64,7 +65,7 @@ void knn_graph(raft::resources const& res,
 
   auto rows_view = raft::make_device_vector_view<value_idx, nnz_t>(rows.data(), nnz);
 
-  raft::linalg::map_offset(res, rows_view, [k] __device__(nnz_t i) { return value_idx(i / k); });
+  cuvs::detail::map_offset(res, rows_view, [k] __device__(nnz_t i) { return value_idx(i / k); });
 
   cuvs::neighbors::all_neighbors::all_neighbors_params params;
   params.metric = metric;
@@ -87,7 +88,7 @@ void knn_graph(raft::resources const& res,
     indices_64_view,
     distances_view);
 
-  raft::linalg::map(res,
+  cuvs::detail::map(res,
                     raft::make_device_vector_view<value_idx, nnz_t>(indices.data(), nnz),
                     raft::cast_op<value_idx>{},
                     raft::make_const_mdspan(indices_64_view));

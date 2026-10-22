@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/map.hpp"
 #include "../silhouette_score.cuh"
 
 #include <raft/core/device_mdspan.hpp>
@@ -201,7 +202,7 @@ value_t silhouette_score(
     a_ptr = scores;
   }
 
-  raft::matrix::fill(
+  cuvs::detail::fill(
     handle, raft::make_device_vector_view<value_t, value_idx>(a_ptr, n_rows), value_t(0));
 
   dim3 block_size(std::min(n_rows, 32), std::min(n_labels, 32));
@@ -263,7 +264,7 @@ value_t silhouette_score(
     raft::min_op());
 
   // calculating the silhouette score per sample
-  raft::linalg::map(
+  cuvs::detail::map(
     handle,
     raft::make_device_vector_view<value_t, value_idx>(a_ptr, n_rows),
     cuvs::stats::detail::SilOp<value_t>(),

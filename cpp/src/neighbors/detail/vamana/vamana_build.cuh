@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/map.hpp"
 #include "../../../sparse/neighbors/cross_component_nn.cuh"
 #include "../../detail/ann_utils.cuh"
 #include "greedy_search.cuh"
@@ -162,7 +163,7 @@ void batched_insert_vamana(
 
   // Initialize graph with invalid neighbor indices (raft::upper_bound<IdxT>()).
   auto d_graph = raft::make_device_matrix<IdxT, int64_t>(res, graph.extent(0), graph.extent(1));
-  raft::linalg::map(res, d_graph.view(), raft::const_op<IdxT>{raft::upper_bound<IdxT>()});
+  cuvs::detail::map(res, d_graph.view(), raft::const_op<IdxT>{raft::upper_bound<IdxT>()});
 
   // Temp storage about each batch of inserts being performed
   auto query_ids      = raft::make_device_vector<IdxT>(res, max_batchsize);
@@ -416,7 +417,7 @@ void batched_insert_vamana(
 
     // compute prefix sums of query_list sizes
     const int prefix_count = step_size + 1;
-    raft::linalg::map_offset(
+    cuvs::detail::map_offset(
       res,
       raft::make_device_vector_view<int, int64_t>(edge_counts.data_handle(), prefix_count),
       [query_list] __device__(int64_t i) { return query_list[i].size; });
@@ -459,7 +460,7 @@ void batched_insert_vamana(
     }
 
     DistPair<IdxT, accT>* edge_dist_pair_ptr = edge_dist_pair.data_handle();
-    raft::linalg::map_offset(
+    cuvs::detail::map_offset(
       res,
       raft::make_device_vector_view<IdxT, int64_t>(edge_dest.data_handle(), total_edges),
       [edge_dist_pair_ptr] __device__(size_t i) { return edge_dist_pair_ptr[i].idx; });
@@ -480,7 +481,7 @@ void batched_insert_vamana(
     // Find which node IDs have reverse edges and their indices in the reverse edge list
     raft::copy(edge_dest_vec.data_handle(), edge_dest.data_handle(), total_edges, stream);
     auto unique_indices = raft::make_device_vector<int>(res, total_edges);
-    raft::linalg::map_offset(res, unique_indices.view(), raft::identity_op{});
+    cuvs::detail::map_offset(res, unique_indices.view(), raft::identity_op{});
 
     thrust::unique_by_key(rmm::exec_policy_nosync(stream, large_ws),
                           thrust::device_pointer_cast(edge_dest_vec.data_handle()),
@@ -653,7 +654,7 @@ index<T, IdxT> build(
     auto pq_codebook =
       raft::make_device_matrix<float, uint32_t>(res, pq_codebook_size * pq_dim, dim_per_subspace);
     auto pq_encoding_table_device_vec_view = pq_encoding_table_device_vec.view();
-    raft::linalg::map_offset(
+    cuvs::detail::map_offset(
       res,
       pq_codebook.view(),
       [pq_encoding_table_device_vec_view,
@@ -714,7 +715,7 @@ index<T, IdxT> build(
         auto dataset_float = raft::make_device_matrix<float, int64_t>(res, batch.size(), dim);
         auto dataset_view  = raft::make_device_matrix_view(
           batch.data(), static_cast<int64_t>(batch.size()), static_cast<int64_t>(dim));
-        raft::linalg::map_offset(
+        cuvs::detail::map_offset(
           res, dataset_float.view(), [dataset_view, dim] __device__(size_t i) {
             int row_idx = i / dim;
             int col_idx = i % dim;

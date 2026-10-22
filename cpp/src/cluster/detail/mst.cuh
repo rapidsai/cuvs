@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../core/map.hpp"
 #include "../../sparse/neighbors/cross_component_nn.cuh"
 #include "raft/core/device_mdspan.hpp"
 #include "raft/core/operators.hpp"
@@ -274,7 +275,7 @@ void connect_knn_graph(
 
   if constexpr (std::is_same<red_op,
                              MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>>::value) {
-    raft::linalg::map_offset(
+    cuvs::detail::map_offset(
       handle,
       pairwise_dist_vec.view(),
       [pairwise_dist_ptr    = pairwise_dist_vec.data_handle(),

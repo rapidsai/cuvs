@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/map.hpp"
 #include "../../../core/nvtx.hpp"
 #include "factory.cuh"
 #include "sample_filter_utils.cuh"
@@ -573,7 +574,7 @@ void search_multi_partition(
       const int64_t per_partition_topk_i64 = per_partition_topk;
       auto transposed_view = raft::make_device_matrix_view<DistanceT, int64_t, raft::row_major>(
         transposed_distances, static_cast<int64_t>(chunk_queries), row_stride);
-      raft::linalg::map_offset(
+      cuvs::detail::map_offset(
         res,
         transposed_view,
         [src, row_stride, partition_stride_i64, per_partition_topk_i64] __device__(int64_t idx) {
@@ -617,7 +618,7 @@ void search_multi_partition(
     // partition (e.g. MULTI_CTA mp).
     auto partition_ids_slice = raft::make_device_matrix_view<uint32_t, int64_t, raft::row_major>(
       partition_ids.data_handle() + static_cast<size_t>(qid) * topk, chunk_queries, topk);
-    raft::linalg::map(res,
+    cuvs::detail::map(res,
                       partition_ids_slice,
                       raft::div_const_op<uint32_t>{per_partition_topk},
                       raft::make_const_mdspan(positions_view));
@@ -629,7 +630,7 @@ void search_multi_partition(
       const int64_t partition_stride_i64   = static_cast<int64_t>(chunk_partition_stride);
       const int64_t per_partition_topk_i64 = per_partition_topk;
       const int64_t topk_i64               = topk;
-      raft::linalg::map_offset(
+      cuvs::detail::map_offset(
         res,
         neighbors_slice,
         [intermediate_neighbors_ptr,
