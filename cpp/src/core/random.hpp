@@ -73,12 +73,6 @@ void uniform(raft::resources const& handle,
   uniform_impl(rng_state, ptr, len, start, end, raft::resource::get_cuda_stream(handle).get());
 }
 
-template <typename OutType, typename LenType = int>
-void uniform(OutType* ptr, LenType len, OutType start, OutType end, cudaStream_t stream)
-{
-  detail::RngImpl::uniform(ptr, len, start, end, stream);
-}
-
 template <typename OutputValueType, typename IndexType>
 void uniformInt(raft::resources const& handle,
                 RngState& rng_state,
@@ -113,12 +107,6 @@ void uniformInt(raft::resources const& handle,
   uniformInt_impl(rng_state, ptr, len, start, end, raft::resource::get_cuda_stream(handle).get());
 }
 
-template <typename OutType, typename LenType = int>
-void uniformInt(OutType* ptr, LenType len, OutType start, OutType end, cudaStream_t stream)
-{
-  detail::RngImpl::uniformInt(ptr, len, start, end, stream);
-}
-
 template <typename OutputValueType, typename IndexType>
 void normal(raft::resources const& handle,
             RngState& rng_state,
@@ -145,12 +133,6 @@ void normal(raft::resources const& handle,
 {
   if (raft::resource::get_dry_run_flag(handle)) { return; }
   normal_impl(rng_state, ptr, len, mu, sigma, raft::resource::get_cuda_stream(handle).get());
-}
-
-template <typename OutType, typename LenType = int>
-void normal(OutType* ptr, LenType len, OutType mu, OutType sigma, cudaStream_t stream)
-{
-  detail::RngImpl::normal(ptr, len, mu, sigma, stream);
 }
 
 template <typename T, typename IdxT, typename accessor, typename layout>
