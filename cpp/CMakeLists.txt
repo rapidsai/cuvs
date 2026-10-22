@@ -1164,6 +1164,14 @@ if(NOT BUILD_CPU_ONLY)
   endblock()
 
   include(cmake/modules/generate_cutile_kernels.cmake)
+  # cuTile can export sm_107 (Rubin) kernels only starting with CUDA 13.4. CUVS_CUTILE_SM107_ENABLED
+  # hides the sm_107 code paths in the older versions.
+  set(CUVS_CUTILE_SM107_ENABLED 0)
+  set(CUVS_CUTILE_EXCLUDED_GPU_CODES "sm_107")
+  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.4)
+    set(CUVS_CUTILE_SM107_ENABLED 1)
+    set(CUVS_CUTILE_EXCLUDED_GPU_CODES "")
+  endif()
   cuvs_cutile_setup(CUVS_CUTILE_ENABLED cutile_python cutile_bin2c)
   if(CUVS_CUTILE_ENABLED)
     set(cutile_smoke_dir "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/jit_lto/cutile_smoke")
@@ -1476,6 +1484,8 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/composite/index.cu
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/cagra.cpp>
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
+    src/neighbors/ivf_binary_index.cpp
+    src/neighbors/ivf_binary/ivf_binary.cu
     src/neighbors/ivf_common.cu
     src/neighbors/ivf_flat_index.cpp
     ${ivf_flat_build_extend_inst_files}
@@ -1572,6 +1582,7 @@ if(NOT BUILD_CPU_ONLY)
   target_compile_definitions(
     cuvs_objs
     PRIVATE CUVS_CUTILE_ENABLED=${CUVS_CUTILE_ENABLED}
+            CUVS_CUTILE_SM107_ENABLED=${CUVS_CUTILE_SM107_ENABLED}
             $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
             $<$<BOOL:${BUILD_MG_ALGOS}>:CUVS_BUILD_MG_ALGOS>
             $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
@@ -1667,19 +1678,6 @@ if(NOT BUILD_CPU_ONLY)
               $<COMPILE_ONLY:cuco::cuco> CUDA::nvJitLink CUDA::nvrtc rtcx::rtcx kvikio::kvikio
       INTERFACE $<LINK_ONLY:kvikio::kvikio>
     )
-
-    # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
-    file(
-      WRITE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld"
-      [=[
-SECTIONS
-{
-.nvFatBinSegment : { *(.nvFatBinSegment) }
-.nv_fatbin : { *(.nv_fatbin) }
-}
-]=]
-    )
-    target_link_options(cuvs PRIVATE $<HOST_LINK:${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld>)
 
   endif()
 
