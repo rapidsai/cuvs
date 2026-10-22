@@ -1110,9 +1110,16 @@ template <typename ValueT, typename SrcT>
   // device is perfectly usable once the caller switches to it, as the multi-GPU paths do). Host
   // memory is only accepted when mapped for the device (pinned) or when the device reads pageable
   // memory through the host page tables (ATS). HMM pageable memory is not device accessible.
-  RAFT_EXPECTS(
-    raft::is_device_accessible(raft::memory_type_from_pointer(src.data_handle())), "%s", error_msg);
-  // With unified virtual addressing the device pointer of host memory equals its host pointer.
+  auto mem_type = raft::memory_type_from_pointer(src.data_handle());
+  RAFT_EXPECTS(raft::is_device_accessible(mem_type), "%s", error_msg);
+  if (mem_type == raft::memory_type::pinned) {
+    // Pinned (cudaMallocHost / cudaHostRegister) memory is reached through its device mapping.
+    cudaPointerAttributes ptr_attrs;
+    RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, src.data_handle()));
+    auto* device_ptr = reinterpret_cast<ValueT*>(ptr_attrs.devicePointer);
+    RAFT_EXPECTS(device_ptr != nullptr, "%s", error_msg);
+    return device_ptr;
+  }
   return const_cast<ValueT*>(src.data_handle());
 }
 
