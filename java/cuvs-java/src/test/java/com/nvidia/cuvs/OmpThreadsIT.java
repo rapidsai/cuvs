@@ -14,6 +14,7 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -22,22 +23,44 @@ import org.junit.runner.RunWith;
 @RunWith(RandomizedRunner.class)
 public class OmpThreadsIT extends CuVSTestCase {
 
+  // Differs from both the old hard-coded reset (1) and the numWriterThreads the tests request (3).
+  private static final int BASELINE = 5;
+
   private MethodHandle ompGetMaxThreads;
+  private MethodHandle ompSetNumThreads;
+  private int original;
 
   @Before
-  public void setup() {
+  public void setup() throws Throwable {
     assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxSupportedArch());
     initializeRandom();
-    var symbol =
-        SymbolLookup.libraryLookup("libgomp.so.1", Arena.global())
-            .find("omp_get_max_threads")
-            .orElseThrow();
+    var libgomp = SymbolLookup.libraryLookup("libgomp.so.1", Arena.global());
+    var linker = Linker.nativeLinker();
     ompGetMaxThreads =
-        Linker.nativeLinker().downcallHandle(symbol, FunctionDescriptor.of(ValueLayout.JAVA_INT));
+        linker.downcallHandle(
+            libgomp.find("omp_get_max_threads").orElseThrow(),
+            FunctionDescriptor.of(ValueLayout.JAVA_INT));
+    ompSetNumThreads =
+        linker.downcallHandle(
+            libgomp.find("omp_set_num_threads").orElseThrow(),
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT));
+    original = ompMaxThreads();
+    setOmpThreads(BASELINE);
+  }
+
+  @After
+  public void restore() throws Throwable {
+    if (ompSetNumThreads != null) {
+      setOmpThreads(original);
+    }
   }
 
   private int ompMaxThreads() throws Throwable {
     return (int) ompGetMaxThreads.invokeExact();
+  }
+
+  private void setOmpThreads(int n) throws Throwable {
+    ompSetNumThreads.invokeExact(n);
   }
 
   @Test
@@ -49,10 +72,9 @@ public class OmpThreadsIT extends CuVSTestCase {
             .build();
     try (var resources = CheckedCuVSResources.create();
         var dataset = CuVSMatrix.ofArray(createFloatMatrix(2000, 32))) {
-      int before = ompMaxThreads();
       try (var index =
           CagraIndex.newBuilder(resources).withDataset(dataset).withIndexParams(params).build()) {
-        assertEquals(before, ompMaxThreads());
+        assertEquals(BASELINE, ompMaxThreads());
       }
     }
   }
@@ -61,9 +83,8 @@ public class OmpThreadsIT extends CuVSTestCase {
   public void testCagraBuildWithoutParamsLeavesOmpThreads() throws Throwable {
     try (var resources = CheckedCuVSResources.create();
         var dataset = CuVSMatrix.ofArray(createFloatMatrix(2000, 32))) {
-      int before = ompMaxThreads();
       try (var index = CagraIndex.newBuilder(resources).withDataset(dataset).build()) {
-        assertEquals(before, ompMaxThreads());
+        assertEquals(BASELINE, ompMaxThreads());
       }
     }
   }
@@ -85,9 +106,9 @@ public class OmpThreadsIT extends CuVSTestCase {
                 .withDataset(dataset2)
                 .withIndexParams(params)
                 .build()) {
-      int before = ompMaxThreads();
+      setOmpThreads(BASELINE);
       try (var merged = CagraIndex.merge(new CagraIndex[] {index1, index2}, params)) {
-        assertEquals(before, ompMaxThreads());
+        assertEquals(BASELINE, ompMaxThreads());
       }
     }
   }
@@ -96,9 +117,8 @@ public class OmpThreadsIT extends CuVSTestCase {
   public void testBruteForceBuildWithoutParams() throws Throwable {
     try (var resources = CheckedCuVSResources.create();
         var dataset = CuVSMatrix.ofArray(createFloatMatrix(500, 16))) {
-      int before = ompMaxThreads();
       try (var index = BruteForceIndex.newBuilder(resources).withDataset(dataset).build()) {
-        assertEquals(before, ompMaxThreads());
+        assertEquals(BASELINE, ompMaxThreads());
       }
     }
   }
