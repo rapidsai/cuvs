@@ -116,12 +116,12 @@ public class TestMultiSegmentGPUFilterConcurrency extends LuceneTestCase {
     // its previous format so the test does not alter later reader construction in this JVM.
     CuVSFilterCodec spiCodec = (CuVSFilterCodec) Codec.forName(codec.getName());
     KnnVectorsFormat previousFormat = spiCodec.knnVectorsFormat();
-    spiCodec.setKnnFormat(
+    spiCodec.setKnnVectorsFormat(
         new CuVS2510GPUVectorsFormat(new GPUSearchParams.Builder().build(), TEST_CACHE_CONFIG));
     try {
       reader = DirectoryReader.open(directory);
     } finally {
-      spiCodec.setKnnFormat(previousFormat);
+      spiCodec.setKnnVectorsFormat(previousFormat);
     }
     searcher = new IndexSearcher(reader);
     queryVectors = generateDataset(random(), numQueries, dimensions);

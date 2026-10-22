@@ -55,7 +55,7 @@ abstract class CuVSFilterCodec extends FilterCodec {
   protected CuVSFilterCodec(String name, Codec delegate, Supplier<KnnVectorsFormat> format) {
     super(name, delegate);
     try {
-      setKnnFormat(format.get());
+      setKnnVectorsFormat(format.get());
     } catch (LibraryException | LinkageError e) {
       // Lucene's service loader creates every codec eagerly, and an exception here would break
       // every codec lookup in the JVM. A format that does not link on the Lucene release in use, or
@@ -63,7 +63,7 @@ abstract class CuVSFilterCodec extends FilterCodec {
       // unavailable delegate. Other exceptions, such as invalid arguments, reach the caller.
       String problem = "Its vectors format is not available: " + e;
       logUnavailable(name, problem);
-      setKnnFormat(new UnavailableFormat(name, problem));
+      setKnnVectorsFormat(new UnavailableFormat(name, problem));
     }
   }
 
@@ -136,12 +136,24 @@ abstract class CuVSFilterCodec extends FilterCodec {
   }
 
   /**
-   * Set the {@link KnnVectorsFormat}.
+   * Sets the {@link KnnVectorsFormat} this codec uses for vectors.
    *
    * @param format the {@link KnnVectorsFormat} to set
    */
-  public void setKnnFormat(KnnVectorsFormat format) {
+  public void setKnnVectorsFormat(KnnVectorsFormat format) {
     this.format = format;
+  }
+
+  /**
+   * Set the {@link KnnVectorsFormat}.
+   *
+   * @param format the {@link KnnVectorsFormat} to set
+   * @deprecated use {@link #setKnnVectorsFormat(KnnVectorsFormat)}, which matches the name of
+   *     {@link #knnVectorsFormat()}
+   */
+  @Deprecated(since = "26.12", forRemoval = true)
+  public void setKnnFormat(KnnVectorsFormat format) {
+    setKnnVectorsFormat(format);
   }
 
   /** Stands in for a delegate codec that cannot be created, and throws when any format is used. */
