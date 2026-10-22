@@ -134,6 +134,19 @@ void copyClusterLabels(raft::resources const& handle,
   });
 }
 
+extern template void copyClusterLabels<int, float, int>(
+  const raft::resources&, const MinClusterAndDistanceResult<float, int>&, int*);
+extern template void copyClusterLabels<int, double, int>(
+  const raft::resources&, const MinClusterAndDistanceResult<double, int>&, int*);
+extern template void copyClusterLabels<int, float, int64_t>(
+  const raft::resources&, const MinClusterAndDistanceResult<float, int64_t>&, int*);
+extern template void copyClusterLabels<int64_t, float, int64_t>(
+  const raft::resources&, const MinClusterAndDistanceResult<float, int64_t>&, int64_t*);
+extern template void copyClusterLabels<int64_t, double, int64_t>(
+  const raft::resources&, const MinClusterAndDistanceResult<double, int64_t>&, int64_t*);
+extern template void copyClusterLabels<uint32_t, float, int64_t>(
+  const raft::resources&, const MinClusterAndDistanceResult<float, int64_t>&, uint32_t*);
+
 // Computes the intensity histogram from a sequence of labels
 template <typename SampleIteratorT, typename CounterT, typename IndexT>
 void countLabels(raft::resources const& handle,
