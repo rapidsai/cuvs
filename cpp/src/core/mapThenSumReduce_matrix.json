@@ -1,0 +1,40 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::mapThenSumReduce",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "double*, int, raft::identity_op, CUstream_st*, double const*"
+      },
+      {
+        "parameter_types": "double*, int, raft::identity_op, CUstream_st*, double const*, double*"
+      },
+      {
+        "parameter_types": "double*, long, raft::identity_op, CUstream_st*, double const*"
+      },
+      {
+        "parameter_types": "double*, unsigned int, raft::compose_op<raft::sq_op, raft::sub_op>, CUstream_st*, double const*, double const*"
+      },
+      {
+        "parameter_types": "double*, unsigned long, raft::compose_op<raft::sq_op, raft::sub_op>, CUstream_st*, double const*, double const*"
+      },
+      {
+        "parameter_types": "float*, int, raft::identity_op, CUstream_st*, float const*"
+      },
+      {
+        "parameter_types": "float*, int, raft::identity_op, CUstream_st*, float const*, float*"
+      },
+      {
+        "parameter_types": "float*, long, raft::identity_op, CUstream_st*, float const*"
+      },
+      {
+        "parameter_types": "float*, unsigned int, raft::compose_op<raft::sq_op, raft::sub_op>, CUstream_st*, float const*, float const*"
+      },
+      {
+        "parameter_types": "float*, unsigned long, raft::compose_op<raft::sq_op, raft::sub_op>, CUstream_st*, float const*, float const*"
+      }
+    ]
+  }
+]
