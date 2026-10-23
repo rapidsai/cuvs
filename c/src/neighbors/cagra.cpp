@@ -55,14 +55,8 @@ struct cuvs_cagra_c_api_index_lifetime_holder {
 /** Owns how to delete co-located index storage; `cuvsCagraIndex::addr` points here. */
 struct sg_cagra_c_api_index_box {
   void* index_ptr;
-  enum class dataset_layout : uint8_t {
-    device_padded,
-    device_standard,
-    device_vpq,
-    device_bbq,
-    host_padded,
-    host_standard
-  } layout;
+  using dataset_layout = cuvs::neighbors::cagra::c_api_dataset_layout;
+  dataset_layout layout;
   cuvs::neighbors::c_api::detail::owner_record owner_rec;
 };
 
@@ -1508,6 +1502,12 @@ void* cagra_c_api_index_ptr(cuvsCagraIndex const* idx)
   // Matches `sg_cagra_c_api_index_box::index_ptr` (first member); keep in sync with that layout.
   if (idx == nullptr || idx->addr == 0) { return nullptr; }
   return *reinterpret_cast<void**>(idx->addr);
+}
+
+c_api_dataset_layout cagra_c_api_index_layout(cuvsCagraIndex const* idx)
+{
+  RAFT_EXPECTS(idx != nullptr && idx->addr != 0, "the CAGRA index handle is empty");
+  return reinterpret_cast<sg_cagra_c_api_index_box*>(idx->addr)->layout;
 }
 }  // namespace cuvs::neighbors::cagra
 

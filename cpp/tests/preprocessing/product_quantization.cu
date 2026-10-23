@@ -351,9 +351,8 @@ TEST(ProductQuantizationTestF, MakeVpqDatasetFromPaddedView)
              host_rows.data_handle(),
              host_rows.size(),
              raft::resource::get_cuda_stream(handle));
-  auto padded = cuvs::neighbors::make_device_standard_dataset_view(
-    raft::make_device_strided_matrix_view<const float, int64_t, raft::row_major>(
-      device_rows.data_handle(), n_rows, dim, stride));
+  auto padded = raft::make_device_strided_matrix_view<const float, int64_t, raft::row_major>(
+    device_rows.data_handle(), n_rows, dim, stride);
 
   cuvs::neighbors::vpq_params params{
     .pq_bits = 4, .pq_dim = 4, .vq_n_centers = 1, .kmeans_n_iters = 2};

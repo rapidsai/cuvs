@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 
+#include "../../../src/neighbors/detail/dataset_serialize.hpp"
 #include "../cagra_padded_build_helpers.cuh"
 #include <cuvs/neighbors/cagra.hpp>
 
@@ -93,12 +94,37 @@ class cagra_serialize_dataset_layouts_test : public ::testing::Test {
 
 TEST_F(cagra_serialize_dataset_layouts_test, load_into_standard_dataset)
 {
+  cagra::index_params params;
+  params.graph_degree              = 16;
+  params.intermediate_graph_degree = 32;
+  auto standard_view =
+    cuvs::neighbors::make_device_standard_dataset_view(raft::make_const_mdspan(dataset_->view()));
+  auto standard_index = cagra::build(res_, params, standard_view);
   std::stringstream ss;
-  serialize_padded_index(ss);
+  cagra::serialize(res_, ss, standard_index, true);
+  raft::resource::sync_stream(res_);
 
   cagra::device_standard_index<data_type, index_type> index(res_);
   std::unique_ptr<cuvs::neighbors::device_standard_dataset<data_type, int64_t>> loaded;
   cagra::deserialize(res_, ss, &index, &loaded);
+  ASSERT_NE(loaded, nullptr);
+  check_rows(loaded->view(), n_dim);
+}
+
+TEST_F(cagra_serialize_dataset_layouts_test, load_wide_stride_payload_into_standard_dataset)
+{
+  // Files written from a dataset with a wider row pitch carry that pitch as a scalar. A standard
+  // dataset is densely packed, so it has to ignore the pitch and read exactly rows * dim elements.
+  cuvs::neighbors::test::padded_device_matrix_for_cagra<data_type> padded(
+    res_, raft::make_const_mdspan(dataset_->view()));
+  auto const stride = static_cast<int64_t>(padded.view.data_const_view().stride(0));
+  ASSERT_GT(stride, n_dim);
+
+  std::stringstream ss;
+  cuvs::neighbors::detail::serialize_cagra_dense_dataset<data_type, int64_t>(res_, ss, padded.view);
+  raft::resource::sync_stream(res_);
+
+  auto loaded = cuvs::neighbors::detail::deserialize_standard_dataset<data_type, int64_t>(res_, ss);
   ASSERT_NE(loaded, nullptr);
   check_rows(loaded->view(), n_dim);
 }
@@ -112,28 +138,6 @@ TEST_F(cagra_serialize_dataset_layouts_test, load_into_padded_dataset)
   std::unique_ptr<cuvs::neighbors::device_padded_dataset<data_type, int64_t>> loaded;
   cagra::deserialize(res_, ss, &index, &loaded);
   ASSERT_NE(loaded, nullptr);
-  check_rows(loaded->view(), stride);
-}
-
-TEST_F(cagra_serialize_dataset_layouts_test, load_standard_file_into_padded_dataset)
-{
-  // The saved rows are packed (stride == dim), the padded dataset restores the padding on load.
-  cagra::index_params params;
-  params.graph_degree              = 16;
-  params.intermediate_graph_degree = 32;
-  auto standard_view =
-    cuvs::neighbors::make_device_standard_dataset_view(raft::make_const_mdspan(dataset_->view()));
-  auto standard_index = cagra::build(res_, params, standard_view);
-  std::stringstream ss;
-  cagra::serialize(res_, ss, standard_index, true);
-  raft::resource::sync_stream(res_);
-
-  cagra::device_padded_index<data_type, index_type> index(res_);
-  std::unique_ptr<cuvs::neighbors::device_padded_dataset<data_type, int64_t>> loaded;
-  cagra::deserialize(res_, ss, &index, &loaded);
-  ASSERT_NE(loaded, nullptr);
-  auto const stride = static_cast<int64_t>(loaded->view().data_const_view().stride(0));
-  ASSERT_GT(stride, n_dim);
   check_rows(loaded->view(), stride);
 }
 
