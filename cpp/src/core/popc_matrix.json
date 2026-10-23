@@ -1,0 +1,29 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "raft::popc",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "template_arguments": "<uint8_t, uint32_t>",
+        "parameter_types": "raft::resources const&, raft::device_vector_view<const uint8_t, uint32_t>, raft::host_scalar_view<const uint32_t, uint32_t>, raft::device_scalar_view<uint32_t>"
+      },
+      {
+        "template_arguments": "<uint16_t, uint32_t>",
+        "parameter_types": "raft::resources const&, raft::device_vector_view<const uint16_t, uint32_t>, raft::host_scalar_view<const uint32_t, uint32_t>, raft::device_scalar_view<uint32_t>"
+      },
+      {
+        "template_arguments": "<uint32_t, uint32_t>",
+        "parameter_types": "raft::resources const&, raft::device_vector_view<const uint32_t, uint32_t>, raft::host_scalar_view<const uint32_t, uint32_t>, raft::device_scalar_view<uint32_t>"
+      },
+      {
+        "template_arguments": "<uint32_t, int64_t>",
+        "parameter_types": "raft::resources const&, raft::device_vector_view<const uint32_t, int64_t>, raft::host_scalar_view<const int64_t, int64_t>, raft::device_scalar_view<int64_t>"
+      },
+      {
+        "template_arguments": "<uint64_t, int64_t>",
+        "parameter_types": "raft::resources const&, raft::device_vector_view<const uint64_t, int64_t>, raft::host_scalar_view<const int64_t, int64_t>, raft::device_scalar_view<int64_t>"
+      }
+    ]
+  }
+]
