@@ -1,0 +1,25 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::thrust_fill",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "rmm::exec_policy_nosync const&, int*, int*, int const&"
+      },
+      {
+        "parameter_types": "thrust::cuda_cub::execute_on_stream const&, __half*, __half*, __half const&"
+      },
+      {
+        "parameter_types": "thrust::cuda_cub::execute_on_stream const&, double*, double*, double const&"
+      },
+      {
+        "parameter_types": "thrust::cuda_cub::execute_on_stream const&, float*, float*, float const&"
+      },
+      {
+        "parameter_types": "thrust::cuda_cub::execute_on_stream const&, int*, int*, int const&"
+      }
+    ]
+  }
+]
