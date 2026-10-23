@@ -1,0 +1,26 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "launch_convert_copy_kernel",
+    "function_qualifiers": "",
+    "namespace_context": "cuvs::neighbors::nn_descent::detail",
+    "_variants": [
+      {
+        "template_arguments": "<__half, __half>",
+        "parameter_types": "dim3, dim3, size_t, cudaStream_t, const __half*, __half*, size_t"
+      },
+      {
+        "template_arguments": "<int8_t, __half>",
+        "parameter_types": "dim3, dim3, size_t, cudaStream_t, const int8_t*, __half*, size_t"
+      },
+      {
+        "template_arguments": "<uint8_t, __half>",
+        "parameter_types": "dim3, dim3, size_t, cudaStream_t, const uint8_t*, __half*, size_t"
+      },
+      {
+        "template_arguments": "<float, __half>",
+        "parameter_types": "dim3, dim3, size_t, cudaStream_t, const float*, __half*, size_t"
+      }
+    ]
+  }
+]
