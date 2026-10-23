@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
+#include "../../core/cub_runtime_launchers.hpp"
 
 #include "../../core/gather_launchers.hpp"
 #include "../../distance/distance.cuh"
@@ -395,12 +396,8 @@ void sampleCentroids(raft::resources const& handle,
   raft::resource::sync_stream(handle);
 
   uint8_t* rawPtr_isSampleCentroid = isSampleCentroid.data_handle();
-  thrust::for_each_n(raft::resource::get_thrust_policy(handle),
-                     sampledMinClusterDistance.data_handle(),
-                     nPtsSampledInRank,
-                     [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> val) {
-                       rawPtr_isSampleCentroid[val.key] = 1;
-                     });
+  cuvs::detail::mark_sampled_centroids(
+    handle, sampledMinClusterDistance.data_handle(), nPtsSampledInRank, rawPtr_isSampleCentroid);
 
   inRankCp.resize(nPtsSampledInRank * n_features, stream);
 

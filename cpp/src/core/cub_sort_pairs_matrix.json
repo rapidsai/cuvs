@@ -1,0 +1,18 @@
+[
+  {
+    "return_type": "cudaError",
+    "qualified_function": "cuvs::detail::cub_sort_pairs",
+    "function_qualifiers": "",
+    "namespace_context": "cuvs::detail",
+    "_variants": [
+      {
+        "template_arguments": "<int*, int*, int*, int*, int>",
+        "parameter_types": "void*, unsigned long&, int*, int*, int*, int*, int, int, int, CUstream_st*"
+      },
+      {
+        "template_arguments": "<unsigned int const*, unsigned int*, unsigned int*, unsigned int*, unsigned long>",
+        "parameter_types": "void*, unsigned long&, unsigned int const*, unsigned int*, unsigned int*, unsigned int*, unsigned long, int, int, CUstream_st*"
+      }
+    ]
+  }
+]
