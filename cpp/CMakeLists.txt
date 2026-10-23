@@ -1476,6 +1476,7 @@ if(NOT BUILD_CPU_ONLY)
     src/core/thrust_reduce_by_key.cu
     src/core/thrust_stable_sort_by_key.cu
     src/core/thrust_transform.cu
+    src/neighbors/ivf_pq/ivf_pq_fp16_overflow.cu
     src/cluster/detail/minClusterDistanceCompute.cu
     src/cluster/agglomerative.cu
     ${gmm_inst_files}
