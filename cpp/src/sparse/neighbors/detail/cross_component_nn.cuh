@@ -4,6 +4,10 @@
  */
 #pragma once
 
+#include "../../../core/map_launchers.hpp"
+
+#include "../../../core/cub_runtime_launchers.hpp"
+#include "../../../core/prefix_scans_launchers.hpp"
 #include "../../../distance/masked_nn.cuh"
 #include <cuvs/distance/distance.hpp>
 
@@ -175,11 +179,11 @@ struct MutualReachabilityFixConnectivitiesRedOp {
   void scatter(const raft::resources& handle, value_idx* map)
   {
     auto tmp_core_dists = raft::make_device_vector<value_t>(handle, m);
-    thrust::scatter(raft::resource::get_thrust_policy(handle),
-                    core_dists,
-                    core_dists + m,
-                    map,
-                    tmp_core_dists.data_handle());
+    cuvs::detail::thrust_scatter(raft::resource::get_thrust_policy(handle),
+                                 core_dists,
+                                 core_dists + m,
+                                 map,
+                                 tmp_core_dists.data_handle());
     raft::copy_async(
       core_dists, tmp_core_dists.data_handle(), m, raft::resource::get_cuda_stream(handle));
   }
@@ -405,8 +409,9 @@ void perform_1nn(raft::resources const& handle,
   auto tmp_colors = raft::make_device_vector<value_idx>(handle, n_rows);
   auto tmp_kvp    = raft::make_device_vector<OutT>(handle, n_rows);
 
-  thrust::scatter(exec_policy, kvp, kvp + n_rows, sort_plan.data_handle(), tmp_kvp.data_handle());
-  thrust::scatter(
+  cuvs::detail::thrust_scatter(
+    exec_policy, kvp, kvp + n_rows, sort_plan.data_handle(), tmp_kvp.data_handle());
+  cuvs::detail::thrust_scatter(
     exec_policy, colors, colors + n_rows, sort_plan.data_handle(), tmp_colors.data_handle());
   reduction_op.scatter(handle, sort_plan.data_handle());
 
@@ -414,7 +419,7 @@ void perform_1nn(raft::resources const& handle,
   raft::copy_async(kvp, tmp_kvp.data_handle(), n_rows, stream);
 
   LookupColorOp<value_idx, value_t> extract_colors_op(colors);
-  raft::linalg::map(
+  cuvs::detail::map(
     handle,
     raft::make_device_vector_view<value_idx, value_idx>(nn_colors, (value_idx)n_rows),
     extract_colors_op,
@@ -599,10 +604,10 @@ void cross_component_nn(
   raft::sparse::op::compute_duplicates_mask(
     out_index.data(), colors.data(), nn_colors.data(), n_rows, stream.get());
 
-  thrust::exclusive_scan(raft::resource::get_thrust_policy(handle),
-                         out_index.data(),
-                         out_index.data() + out_index.size(),
-                         out_index.data());
+  cuvs::detail::thrust_exclusive_scan(raft::resource::get_thrust_policy(handle),
+                                      out_index.data(),
+                                      out_index.data() + out_index.size(),
+                                      out_index.data());
 
   // compute final size
   value_idx size_int = 0;

@@ -6,6 +6,8 @@
 #pragma once
 
 #include "../../core/normalize.hpp"
+
+#include "../../core/map_launchers.hpp"
 #include "../../core/nvtx.hpp"
 #include "../detail/ann_utils.cuh"
 #include "../ivf_common.cuh"
@@ -494,7 +496,7 @@ void ivfpq_search_worker(raft::resources const& handle,
     auto index_list   = index_list_buf.data_handle();
     index_list_sorted = index_list_sorted_buf.data();
 
-    raft::linalg::map_offset(handle, index_list_buf.view(), raft::identity_op{});
+    cuvs::detail::map_offset(handle, index_list_buf.view(), raft::identity_op{});
 
     int begin_bit             = 0;
     int end_bit               = sizeof(uint32_t) * 8;
@@ -602,7 +604,7 @@ void ivfpq_search_worker(raft::resources const& handle,
   if (manage_local_topk) {
     query_kths_buf.emplace(
       raft::make_device_mdarray<float>(handle, mr, raft::make_extents<uint32_t>(n_queries)));
-    raft::linalg::map(
+    cuvs::detail::map(
       handle,
       query_kths_buf->view(),
       raft::const_op<float>{ivf::detail::dummy_block_sort_t<ScoreT, IdxT>::queue_t::kDummy});
