@@ -1,0 +1,16 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::make_monotonic",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "int*, int*, unsigned long, CUstream_st*, bool"
+      },
+      {
+        "parameter_types": "long*, long*, unsigned long, CUstream_st*, bool"
+      }
+    ]
+  }
+]
