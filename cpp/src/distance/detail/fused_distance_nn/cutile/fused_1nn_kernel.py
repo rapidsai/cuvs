@@ -20,6 +20,10 @@ METRIC_COSINE_EXPANDED = 2
 METRIC_INNER_PRODUCT = 6
 METRIC_BITWISE_HAMMING = 20
 
+# ~FLT_MAX (cuTile has no float limits): larger than any score, so it marks "no candidate yet" and
+# the masked columns of the last tile in the argmin.
+FLT_MAX = 3.4e38
+
 # The binary variant needs block-scaled fp4 MMA, which Blackwell and later have (tcgen05 on
 # sm_100 / sm_107, warp-level mma on sm_120). Older GPUs keep the SIMT popc kernel.
 BINARY_GPU_CODES = ("sm_100", "sm_107", "sm_120")
@@ -92,7 +96,7 @@ def make_kernel(
         tk: ConstInt,
     ):
         bidm = ct.bid(0)
-        best_dist = ct.full(best_shape, 3.4e38, acc_dtype)
+        best_dist = ct.full(best_shape, FLT_MAX, acc_dtype)
         best_idx = ct.zeros(best_shape, idx_dtype)
         num_tiles_k = ct.num_tiles(A, axis=1, shape=(tm, tk))
         num_tiles_n = ct.num_tiles(B, axis=0, shape=(tn, tk))
@@ -112,7 +116,7 @@ def make_kernel(
                 (dists, indices),
                 1,
                 red_op,
-                (3.4e38, -1),
+                (FLT_MAX, -1),
                 keepdims=True,
             )
 
@@ -153,7 +157,7 @@ def make_kernel(
 
             if n == num_tiles_n - 1:
                 col = ct.arange(tn, dtype=ct.int16)
-                score = ct.where((n * tn + col)[None, :] < N, score, 3.4e38)
+                score = ct.where((n * tn + col)[None, :] < N, score, FLT_MAX)
 
             curr_best, curr_idx = reduce_scores(
                 score.reshape(core_shape), local_indices
@@ -240,7 +244,7 @@ def _make_binary_kernel(kernel_options, idx_dtype, tile_m):
             cond = (a_score < b_score) | ((a_score == b_score) & (a_idx < b_idx))
             return ct.where(cond, a_score, b_score), ct.where(cond, a_idx, b_idx)
 
-        best_dist = ct.full(best_shape, 3.4e38, ct.float32)
+        best_dist = ct.full(best_shape, FLT_MAX, ct.float32)
         best_idx = ct.zeros(best_shape, idx_dtype)
         local_indices = ct.arange(tn, dtype=ct.int16)[None, :]
         for n in range(num_tiles_n):
@@ -260,10 +264,10 @@ def _make_binary_kernel(kernel_options, idx_dtype, tile_m):
             score = b_popc[None, :] - 2.0 * accumulator
             if n == num_tiles_n - 1:
                 col = ct.arange(tn, dtype=ct.int16)
-                score = ct.where((n * tn + col)[None, :] < N, score, 3.4e38)
+                score = ct.where((n * tn + col)[None, :] < N, score, FLT_MAX)
 
             curr_best, curr_idx = ct.reduce(
-                (score, local_indices), 1, red_op, (3.4e38, -1), keepdims=True
+                (score, local_indices), 1, red_op, (FLT_MAX, -1), keepdims=True
             )
             update = curr_best < best_dist
             best_dist = ct.where(update, curr_best, best_dist)
