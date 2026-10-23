@@ -1,0 +1,16 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::argmin",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, long, raft::row_major>, raft::device_vector_view<int, long, raft::row_major>"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, long, raft::row_major>, raft::device_vector_view<unsigned int, long, raft::row_major>"
+      }
+    ]
+  }
+]
