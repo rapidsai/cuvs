@@ -1,0 +1,18 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "histogram",
+    "function_qualifiers": "",
+    "namespace_context": "cuvs::detail",
+    "_variants": [
+      {
+        "template_arguments": "<uint32_t, int64_t>",
+        "parameter_types": "raft::stats::HistType, int *, int64_t, const uint32_t *, int64_t, int64_t, cudaStream_t"
+      },
+      {
+        "template_arguments": "<uint32_t, size_t>",
+        "parameter_types": "raft::stats::HistType, int *, size_t, const uint32_t *, size_t, size_t, cudaStream_t"
+      }
+    ]
+  }
+]
