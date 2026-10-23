@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../core/map_launchers.hpp"
 #include "../../../core/nvtx.hpp"
 #include "../../../neighbors/detail/vpq_dataset.cuh"
 #include "pq_codepacking.cuh"  // pq_bits-bitfield
@@ -372,11 +373,11 @@ void vpq_convert_math_type(const raft::resources& res,
                            const cuvs::neighbors::device_vpq_dataset<OldMathT, IdxT>& src,
                            cuvs::neighbors::device_vpq_dataset<NewMathT, IdxT>& dst)
 {
-  raft::linalg::map(res,
+  cuvs::detail::map(res,
                     dst.vq_code_book.view(),
                     cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
                     raft::make_const_mdspan(src.vq_code_book.view()));
-  raft::linalg::map(res,
+  cuvs::detail::map(res,
                     dst.pq_code_book.view(),
                     cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
                     raft::make_const_mdspan(src.pq_code_book.view()));

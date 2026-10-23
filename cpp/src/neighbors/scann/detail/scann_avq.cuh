@@ -3,7 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "../../../core/map_launchers.hpp"
+
 #include "../../../core/cub_runtime_launchers.hpp"
+#include "../../../core/prefix_scans_launchers.hpp"
 #include <cub/device/device_histogram.cuh>
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_scan.cuh>
@@ -116,19 +119,19 @@ void compute_cluster_offsets(raft::resources const& dev_resources,
   // Done in place
   temp_storage_bytes = 0;
 
-  cub::DeviceScan::ExclusiveSum(nullptr,
-                                temp_storage_bytes,
-                                cluster_sizes.data_handle(),
-                                cluster_sizes.data_handle(),
-                                num_items);
+  cuvs::detail::cub_exclusive_sum(nullptr,
+                                  temp_storage_bytes,
+                                  cluster_sizes.data_handle(),
+                                  cluster_sizes.data_handle(),
+                                  num_items);
 
   rmm::device_uvector<char> temp_storage_sum(temp_storage_bytes, stream, device_memory);
 
-  cub::DeviceScan::ExclusiveSum(temp_storage_sum.data(),
-                                temp_storage_bytes,
-                                cluster_sizes.data_handle(),
-                                cluster_sizes.data_handle(),
-                                num_items);
+  cuvs::detail::cub_exclusive_sum(temp_storage_sum.data(),
+                                  temp_storage_bytes,
+                                  cluster_sizes.data_handle(),
+                                  cluster_sizes.data_handle(),
+                                  num_items);
 }
 
 // Sum elements of device vector into device scalar
@@ -225,7 +228,7 @@ void compute_avq_centroid(raft::resources const& dev_resources,
   auto norms_eta_3 = raft::make_device_vector<float, int64_t>(dev_resources, x.extent(0));
   auto eta_3       = raft::make_host_scalar<float>((eta - 3) / 2);
 
-  raft::linalg::power_scalar(dev_resources,
+  cuvs::detail::power_scalar(dev_resources,
                              raft::make_const_mdspan(norms.view()),
                              norms_eta_3.view(),
                              raft::make_const_mdspan(eta_3.view()));
@@ -234,7 +237,7 @@ void compute_avq_centroid(raft::resources const& dev_resources,
   auto norms_eta_1 = raft::make_device_vector<float, int64_t>(dev_resources, x.extent(0));
   auto eta_1       = raft::make_host_scalar<float>(eta - 1);
 
-  raft::linalg::power_scalar(dev_resources,
+  cuvs::detail::power_scalar(dev_resources,
                              raft::make_const_mdspan(norms.view()),
                              norms_eta_1.view(),
                              raft::make_const_mdspan(eta_1.view()));
@@ -303,7 +306,7 @@ void compute_avq_centroid(raft::resources const& dev_resources,
 
   auto h_eta = raft::make_host_scalar<float>(eta);
 
-  raft::linalg::multiply_scalar(dev_resources,
+  cuvs::detail::multiply_scalar(dev_resources,
                                 raft::make_const_mdspan(avq_centroid),
                                 avq_centroid,
                                 raft::make_const_mdspan(h_eta.view()));

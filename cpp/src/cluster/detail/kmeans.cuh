@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#include "../../core/map_launchers.hpp"
+
 #include "../../core/cub_runtime_launchers.hpp"
 #include "../../core/nvtx.hpp"
 #include "../../neighbors/detail/ann_utils.cuh"
@@ -94,7 +96,7 @@ void cluster_cost(
     cuvs::distance::detail::Top1nnBackend::Stable);
 
   if (sample_weight.has_value()) {
-    raft::linalg::map(
+    cuvs::detail::map(
       handle, distances, raft::mul_op{}, raft::make_const_mdspan(distances), sample_weight.value());
   }
   computeClusterCost(handle, distances, workspace, cost, raft::identity_op{}, raft::add_op{});
@@ -569,7 +571,7 @@ void initScalableKMeansPlusPlus(raft::resources const& handle,
         workspace,
         tf32_normx_view);
 
-      raft::linalg::map(handle,
+      cuvs::detail::map(handle,
                         minClusterDistanceVec.view(),
                         raft::min_op{},
                         raft::make_const_mdspan(minClusterDistanceVec.view()),
@@ -1157,7 +1159,7 @@ void kmeans_fit(
                                                     iter_params.batch_samples,
                                                     iter_params.batch_centroids,
                                                     batch_sw);
-        raft::linalg::add(clustering_cost.data_handle(),
+        cuvs::detail::add(clustering_cost.data_handle(),
                           clustering_cost.data_handle(),
                           batch_cost.data_handle(),
                           1,

@@ -1432,6 +1432,25 @@ if(NOT BUILD_CPU_ONLY)
   )
 
   # Keep every primitive function in its own CUDA translation unit.
+  foreach(primitive IN ITEMS src/core/add src/core/map src/core/map_offset src/core/unaryOp)
+    set(primitive_instantiations)
+    generate_string_matrix(
+      primitive_instantiations
+      MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}_matrix.json"
+      ITEM_FORMAT
+      "template @return_type@ @qualified_function@@template_arguments@(@parameter_types@)@function_qualifiers@@semicolon@"
+      GLUE
+      "\n"
+    )
+    configure_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}.cu.in"
+      "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu" @ONLY
+    )
+    list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
+  endforeach()
+
+  # Keep every primitive function in its own CUDA translation unit.
   foreach(
     primitive IN
     ITEMS src/core/cub_argmin
@@ -1459,9 +1478,32 @@ if(NOT BUILD_CPU_ONLY)
     list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
   endforeach()
 
+  # Keep every primitive function in its own CUDA translation unit.
+  foreach(primitive IN ITEMS src/core/cub_exclusive_sum src/core/exclusive_scan_dispatch
+                             src/core/thrust_exclusive_scan src/core/thrust_inclusive_scan
+  )
+    set(primitive_instantiations)
+    generate_string_matrix(
+      primitive_instantiations
+      MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}_matrix.json"
+      ITEM_FORMAT
+      "template @return_type@ @qualified_function@@template_arguments@(@parameter_types@)@function_qualifiers@@semicolon@"
+      GLUE
+      "\n"
+    )
+    configure_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}.cu.in"
+      "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu" @ONLY
+    )
+    list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
+  endforeach()
+
   add_library(
     cuvs_objs OBJECT
     ${cuvs_primitive_sources}
+    src/core/addScalar.cu
+    src/core/calc_nnz_by_rows.cu
     src/core/copy_distance_tile.cu
     src/core/cub_device_flagged_if.cu
     src/core/cub_device_select_if.cu
@@ -1469,9 +1511,14 @@ if(NOT BUILD_CPU_ONLY)
     src/core/cub_max.cu
     src/core/cub_ptx_query.cu
     src/core/cub_reduce_second_tile.cu
+    src/core/cub_scan.cu
+    src/core/cub_scan_init.cu
     src/core/cub_transform.cu
+    src/core/gpu_repeat_csr.cu
     src/core/has_non_finite.cu
     src/core/mask_distance_tile.cu
+    src/core/multiply_scalar.cu
+    src/core/power_scalar.cu
     src/core/thrust_for_each.cu
     src/core/thrust_reduce_by_key.cu
     src/core/thrust_stable_sort_by_key.cu

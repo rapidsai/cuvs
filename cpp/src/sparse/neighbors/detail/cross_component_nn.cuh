@@ -4,7 +4,10 @@
  */
 #pragma once
 
+#include "../../../core/map_launchers.hpp"
+
 #include "../../../core/cub_runtime_launchers.hpp"
+#include "../../../core/prefix_scans_launchers.hpp"
 #include "../../../distance/masked_nn.cuh"
 #include <cuvs/distance/distance.hpp>
 
@@ -416,7 +419,7 @@ void perform_1nn(raft::resources const& handle,
   raft::copy_async(kvp, tmp_kvp.data_handle(), n_rows, stream);
 
   LookupColorOp<value_idx, value_t> extract_colors_op(colors);
-  raft::linalg::map(
+  cuvs::detail::map(
     handle,
     raft::make_device_vector_view<value_idx, value_idx>(nn_colors, (value_idx)n_rows),
     extract_colors_op,
@@ -601,10 +604,10 @@ void cross_component_nn(
   raft::sparse::op::compute_duplicates_mask(
     out_index.data(), colors.data(), nn_colors.data(), n_rows, stream.get());
 
-  thrust::exclusive_scan(raft::resource::get_thrust_policy(handle),
-                         out_index.data(),
-                         out_index.data() + out_index.size(),
-                         out_index.data());
+  cuvs::detail::thrust_exclusive_scan(raft::resource::get_thrust_policy(handle),
+                                      out_index.data(),
+                                      out_index.data() + out_index.size(),
+                                      out_index.data());
 
   // compute final size
   value_idx size_int = 0;
