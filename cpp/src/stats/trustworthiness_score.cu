@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <core/cub_ptx_query.hpp>
+
 #include <cuvs/stats/trustworthiness_score.hpp>
 
 #include "./detail/trustworthiness_score.cuh"
