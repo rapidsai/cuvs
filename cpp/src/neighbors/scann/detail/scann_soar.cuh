@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "../../../core/normalize.hpp"
+
+#include "../../../core/map_launchers.hpp"
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
@@ -52,7 +55,7 @@ void compute_soar_labels(raft::resources const& dev_resources,
   auto residuals_norm = raft::make_device_matrix<float, int64_t>(
     dev_resources, residuals.extent(0), residuals.extent(1));
 
-  raft::linalg::row_normalize(dev_resources,
+  cuvs::detail::row_normalize(dev_resources,
                               residuals,
                               residuals_norm.view(),
                               0.0f,
@@ -110,10 +113,10 @@ void compute_soar_labels(raft::resources const& dev_resources,
     soar_scores.view(),
     raft::sub_op());
 
-  raft::linalg::map(
+  cuvs::detail::map(
     dev_resources, soar_scores.view(), raft::sq_op{}, raft::make_const_mdspan(soar_scores.view()));
 
-  raft::linalg::map(dev_resources,
+  cuvs::detail::map(dev_resources,
                     soar_scores.view(),
                     raft::mul_const_op<float>(lambda),
                     raft::make_const_mdspan(soar_scores.view()));

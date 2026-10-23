@@ -7,6 +7,9 @@
 // Created by Stardust on 3/10/25.
 //
 
+#include "../../../core/normalize.hpp"
+
+#include "../../../core/map_launchers.hpp"
 #include "../../detail/smem_utils.cuh"
 #include "../utils/reductions.cuh"
 #include "quantizer_gpu.cuh"
@@ -880,10 +883,10 @@ float DataQuantizerGPU::get_const_scaling_factors(raft::resources const& handle,
   raft::random::normal(handle, rng, rand.data_handle(), kConstNum * dim, 0., 1.);
   // row-wise normalization
   auto row_normalized = raft::make_device_matrix<double, size_t>(handle, kConstNum, dim);
-  raft::linalg::row_normalize<raft::linalg::L2Norm, double, size_t>(
+  cuvs::detail::row_normalize<raft::linalg::L2Norm, double, size_t>(
     handle, rand.view(), row_normalized.view());
   // take abs values (reusing memory allocation for `rand`)
-  raft::linalg::map(handle,
+  cuvs::detail::map(handle,
                     rand.view(),
                     raft::abs_op{},
                     raft::make_device_vector_view<const double, size_t>(

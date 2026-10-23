@@ -4,6 +4,9 @@
  */
 #pragma once
 
+#include "../../core/map_launchers.hpp"
+
+#include "../../core/cub_runtime_launchers.hpp"
 #include "../../core/nvtx.hpp"
 #include "../../neighbors/detail/ann_utils.cuh"
 #include "kmeans_batch_loader.cuh"
@@ -93,7 +96,7 @@ void cluster_cost(
     cuvs::distance::detail::Top1nnBackend::Stable);
 
   if (sample_weight.has_value()) {
-    raft::linalg::map(
+    cuvs::detail::map(
       handle, distances, raft::mul_op{}, raft::make_const_mdspan(distances), sample_weight.value());
   }
   computeClusterCost(handle, distances, workspace, cost, raft::identity_op{}, raft::add_op{});
@@ -296,23 +299,23 @@ void kmeansPlusPlus(raft::resources const& handle,
     {
       // Determine temporary device storage requirements
       size_t temp_storage_bytes = 0;
-      cub::DeviceReduce::ArgMin(nullptr,
-                                temp_storage_bytes,
-                                costPerCandidate.data_handle(),
-                                minClusterIndexAndDistance.data(),
-                                costPerCandidate.extent(0),
-                                stream);
+      cuvs::detail::cub_argmin(nullptr,
+                               temp_storage_bytes,
+                               costPerCandidate.data_handle(),
+                               minClusterIndexAndDistance.data(),
+                               costPerCandidate.extent(0),
+                               stream);
 
       // Allocate temporary storage
       workspace.resize(temp_storage_bytes, stream);
 
       // Run argmin-reduction
-      cub::DeviceReduce::ArgMin(workspace.data(),
-                                temp_storage_bytes,
-                                costPerCandidate.data_handle(),
-                                minClusterIndexAndDistance.data(),
-                                costPerCandidate.extent(0),
-                                stream);
+      cuvs::detail::cub_argmin(workspace.data(),
+                               temp_storage_bytes,
+                               costPerCandidate.data_handle(),
+                               minClusterIndexAndDistance.data(),
+                               costPerCandidate.extent(0),
+                               stream);
 
       int bestCandidateIdx = -1;
       raft::copy(handle,
@@ -568,7 +571,7 @@ void initScalableKMeansPlusPlus(raft::resources const& handle,
         workspace,
         tf32_normx_view);
 
-      raft::linalg::map(handle,
+      cuvs::detail::map(handle,
                         minClusterDistanceVec.view(),
                         raft::min_op{},
                         raft::make_const_mdspan(minClusterDistanceVec.view()),
@@ -1156,7 +1159,7 @@ void kmeans_fit(
                                                     iter_params.batch_samples,
                                                     iter_params.batch_centroids,
                                                     batch_sw);
-        raft::linalg::add(clustering_cost.data_handle(),
+        cuvs::detail::add(clustering_cost.data_handle(),
                           clustering_cost.data_handle(),
                           batch_cost.data_handle(),
                           1,

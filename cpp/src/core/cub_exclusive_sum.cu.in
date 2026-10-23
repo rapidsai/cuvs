@@ -1,0 +1,27 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <core/cub_ptx_query.hpp>
+
+#include <core/cub_scan_launchers.hpp>
+
+#include <core/prefix_scans_launchers.hpp>
+#include <cub/device/device_scan.cuh>
+#include <cuvs/core/cuda_fp16.hpp>
+#include <rmm/exec_policy.hpp>
+#include <thrust/scan.h>
+
+namespace cuvs::detail {
+
+template <typename InputIt, typename OutputIt, typename NumItems>
+cudaError_t cub_exclusive_sum(
+  void* storage, size_t& bytes, InputIt input, OutputIt output, NumItems count, cudaStream_t stream)
+{
+  return cub::DeviceScan::ExclusiveSum(storage, bytes, input, output, count, stream);
+}
+
+@primitive_instantiations@
+
+}  // namespace cuvs::detail
