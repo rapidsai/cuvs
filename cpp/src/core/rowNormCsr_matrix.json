@@ -1,0 +1,16 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::rowNormCsr",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "raft::resources const&, int const*, double const*, int, int, double*, raft::linalg::NormType, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, int const*, float const*, int, int, float*, raft::linalg::NormType, raft::identity_op"
+      }
+    ]
+  }
+]
