@@ -1,0 +1,11 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <core/cub_ptx_query.hpp>
+
+#include <cuvs/core/cuda_fp16.hpp>
+#include <raft/matrix/detail/select_k-inl.cuh>
+
+@primitive_instantiations@
