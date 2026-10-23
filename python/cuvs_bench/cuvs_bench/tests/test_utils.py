@@ -1,12 +1,15 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
 """
 Unit tests for shared backend utilities and Dataset transparent loading.
 """
 
+import os
 import struct
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -24,6 +27,7 @@ from cuvs_bench.backends._utils import (
     compute_recall,
     dtype_from_filename,
     expand_param_grid,
+    get_index_filename,
     load_vectors,
 )
 from cuvs_bench.generate_groundtruth.utils import (
@@ -669,6 +673,27 @@ class TestConfigLoaderMethods:
         assert result["name"] == "glove-100"
         assert result["dims"] == 100
 
+    def test_prepare_indexes_uses_gpu_index_names(self, tmp_path):
+        """faiss_cpu_hnsw_cagra index names resolve to GPU-built files."""
+        loader = CppGBenchConfigLoader()
+        indexes = loader.prepare_indexes(
+            [{"graph_degree": 32, "base_level_only": True}],
+            [{"efSearch": 64}],
+            "faiss_cpu_hnsw_cagra",
+            "base",
+            {"dataset": {"dims": 128}},
+            {"faiss_cpu_hnsw_cagra": {"groups": {}, "constraints": {}}},
+            str(tmp_path),
+            "test",
+            10,
+            10,
+        )
+        name = "faiss_gpu_cagra_hnsw.graph_degree32.base_level_onlyTrue"
+        assert len(indexes) == 1
+        assert indexes[0]["algo"] == "faiss_cpu_hnsw_cagra"
+        assert indexes[0]["name"] == name
+        assert indexes[0]["file"] == str(tmp_path / "test" / "index" / name)
+
     def test_get_dataset_configuration_not_found(self):
         """Test that missing datasets raise ValueError."""
         loader = CppGBenchConfigLoader()
@@ -713,6 +738,43 @@ class TestExpandParamGrid:
         assert len(result) == 4
         assert {"a": 1, "b": 3, "c": 4} in result
         assert {"a": 2, "b": 3, "c": 5} in result
+
+
+class TestGetIndexFilename:
+    """Tests for get_index_filename."""
+
+    LONG_NAME = "faiss_gpu_cagra_hnsw" + ".param_with_a_long_name12345" * 5
+
+    def test_short_name_is_unchanged(self):
+        """Names under 128 characters are used as file names."""
+        name = "faiss_gpu_cagra_hnsw.graph_degree32"
+        assert get_index_filename(name) == name
+
+    def test_long_name_is_shortened(self):
+        """Long names are replaced by a 64-character hex digest."""
+        filename = get_index_filename(self.LONG_NAME)
+        assert len(self.LONG_NAME) >= 128
+        assert len(filename) == 64
+        assert filename != get_index_filename(self.LONG_NAME + "x")
+
+    def test_long_name_is_stable_across_processes(self):
+        """Separate processes, as in build and search runs, agree."""
+        code = (
+            "import sys;"
+            "from cuvs_bench.backends._utils import get_index_filename;"
+            "print(get_index_filename(sys.argv[1]))"
+        )
+        filenames = {
+            subprocess.run(
+                [sys.executable, "-c", code, self.LONG_NAME],
+                env={**os.environ, "PYTHONHASHSEED": seed},
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.splitlines()[-1]
+            for seed in ("1", "2")
+        }
+        assert filenames == {get_index_filename(self.LONG_NAME)}
 
 
 class TestComputeRecall:

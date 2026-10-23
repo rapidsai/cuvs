@@ -18,6 +18,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from ..backends._utils import get_index_name_prefix
+
 mpl.use("Agg")
 
 metrics = {
@@ -227,20 +229,24 @@ def create_plot_build(
         xs = points[:, 2]
         ls = points[:, 0]
         idxs = points[:, 1]
+        build_algos = {name: get_index_name_prefix(name) for name in set(ls)}
+
+        def build_time(i):
+            return build_results[(build_algos[ls[i]], idxs[i])][0][2]
 
         len_80, len_90, len_95, len_99 = 0, 0, 0, 0
         for i in range(len(xs)):
             if xs[i] >= 0.80 and xs[i] < 0.90:
-                bt_80[pos] = bt_80[pos] + build_results[(ls[i], idxs[i])][0][2]
+                bt_80[pos] = bt_80[pos] + build_time(i)
                 len_80 = len_80 + 1
             elif xs[i] >= 0.9 and xs[i] < 0.95:
-                bt_90[pos] = bt_90[pos] + build_results[(ls[i], idxs[i])][0][2]
+                bt_90[pos] = bt_90[pos] + build_time(i)
                 len_90 = len_90 + 1
             elif xs[i] >= 0.95 and xs[i] < 0.99:
-                bt_95[pos] = bt_95[pos] + build_results[(ls[i], idxs[i])][0][2]
+                bt_95[pos] = bt_95[pos] + build_time(i)
                 len_95 = len_95 + 1
             elif xs[i] >= 0.99:
-                bt_99[pos] = bt_99[pos] + build_results[(ls[i], idxs[i])][0][2]
+                bt_99[pos] = bt_99[pos] + build_time(i)
                 len_99 = len_99 + 1
         if len_80 > 0:
             bt_80[pos] = bt_80[pos] / len_80
@@ -578,11 +584,16 @@ def main(
             args["x_start"],
         )
     if build:
+        build_algorithms = [get_index_name_prefix(algo) for algo in algorithms]
+        build_algo_groups = [
+            ".".join([get_index_name_prefix(algo), *group])
+            for algo, *group in (ag.split(".") for ag in algo_groups)
+        ]
         build_results = load_all_results(
             os.path.join(args["dataset_path"], args["dataset"]),
-            algorithms,
+            build_algorithms,
             groups,
-            algo_groups,
+            build_algo_groups,
             k,
             batch_size,
             "build",

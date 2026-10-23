@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -21,6 +21,7 @@ We standardize on .f16bin here to match the naming convention of the other
 formats (.fbin, .i8bin, .u8bin).
 """
 
+import hashlib
 import itertools
 import os
 from typing import Any, Dict, List, Optional
@@ -151,6 +152,38 @@ def expand_param_grid(
         dict(zip(keys, vals))
         for vals in itertools.product(*param_spec.values())
     ]
+
+
+def get_index_name_prefix(algo: str) -> str:
+    """
+    Return the prefix of the names of the indexes ``algo`` searches.
+
+    The prefix is the name of the algorithm that built the indexes, which is
+    also the name its build results are stored under. ``faiss_cpu_hnsw_cagra``
+    only searches indexes built by ``faiss_gpu_cagra_hnsw``; every other
+    algorithm builds its own indexes.
+
+    ``algo`` may include a group suffix, as in result CSVs for groups other
+    than ``base``: ``faiss_cpu_hnsw_cagra_large`` maps to
+    ``faiss_gpu_cagra_hnsw_large``.
+    """
+    search_algo, build_algo = "faiss_cpu_hnsw_cagra", "faiss_gpu_cagra_hnsw"
+    if algo == search_algo or algo.startswith(f"{search_algo}_"):
+        return build_algo + algo[len(search_algo) :]
+    return algo
+
+
+def get_index_filename(index_name: str) -> str:
+    """
+    Return the file name an index named ``index_name`` is saved under.
+
+    Names of 128 characters or more are replaced by their SHA-256 digest. The
+    digest is the same in every process, so separate build and search runs,
+    including runs on different hosts, resolve the same file.
+    """
+    if len(index_name) < 128:
+        return index_name
+    return hashlib.sha256(index_name.encode()).hexdigest()
 
 
 def compute_recall(
