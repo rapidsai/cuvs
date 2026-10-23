@@ -1,0 +1,31 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::thrust_sort_by_key",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "rmm::exec_policy_nosync const&, thrust::zip_iterator<cuda::std::tuple<long*, float*>>, thrust::zip_iterator<cuda::std::tuple<long*, float*>>, long*, cuvs::neighbors::ball_cover::detail::NNComp"
+      },
+      {
+        "parameter_types": "rmm::exec_policy_nosync const&, int*, int*, int*"
+      },
+      {
+        "parameter_types": "rmm::exec_policy_nosync const&, long*, long*, long*"
+      },
+      {
+        "parameter_types": "rmm::exec_policy_nosync const&, thrust::zip_iterator<cuda::std::tuple<int*, int*, raft::KeyValuePair<int, float>*>>, thrust::zip_iterator<cuda::std::tuple<int*, int*, raft::KeyValuePair<int, float>*>>, thrust::zip_iterator<cuda::std::tuple<int*>>, cuvs::sparse::neighbors::detail::TupleComp"
+      },
+      {
+        "parameter_types": "rmm::exec_policy_nosync const&, thrust::zip_iterator<cuda::std::tuple<long*, long*, raft::KeyValuePair<long, float>*>>, thrust::zip_iterator<cuda::std::tuple<long*, long*, raft::KeyValuePair<long, float>*>>, thrust::zip_iterator<cuda::std::tuple<long*>>, cuvs::sparse::neighbors::detail::TupleComp"
+      },
+      {
+        "parameter_types": "thrust::device_ptr<int>, thrust::device_ptr<int>, thrust::zip_iterator<cuda::std::tuple<thrust::device_ptr<int>, thrust::device_ptr<float>>>"
+      },
+      {
+        "parameter_types": "thrust::device_ptr<long>, thrust::device_ptr<long>, thrust::zip_iterator<cuda::std::tuple<thrust::device_ptr<long>, thrust::device_ptr<float>>>"
+      }
+    ]
+  }
+]
