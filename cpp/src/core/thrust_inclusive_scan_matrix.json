@@ -1,0 +1,16 @@
+[
+  {
+    "return_type": "int*",
+    "qualified_function": "cuvs::detail::thrust_inclusive_scan",
+    "template_arguments": "",
+    "parameter_types": "rmm::exec_policy const&, int*, int*, int*",
+    "function_qualifiers": ""
+  },
+  {
+    "return_type": "long*",
+    "qualified_function": "cuvs::detail::thrust_inclusive_scan",
+    "template_arguments": "",
+    "parameter_types": "rmm::exec_policy const&, unsigned int const*, unsigned int const*, long*, cuda::std::plus<void>",
+    "function_qualifiers": ""
+  }
+]

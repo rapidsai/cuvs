@@ -1,0 +1,22 @@
+[
+  {
+    "return_type": "cudaError_t",
+    "qualified_function": "cuvs::detail::cub_exclusive_sum",
+    "function_qualifiers": "",
+    "namespace_context": "cuvs::detail",
+    "_variants": [
+      {
+        "template_arguments": "<int*, int*, int>",
+        "parameter_types": "void*, unsigned long&, int*, int*, int, cudaStream_t"
+      },
+      {
+        "template_arguments": "<unsigned int*, unsigned int*, int>",
+        "parameter_types": "void*, unsigned long&, unsigned int*, unsigned int*, int, cudaStream_t"
+      },
+      {
+        "template_arguments": "<unsigned long long*, unsigned long*, unsigned long>",
+        "parameter_types": "void*, unsigned long&, unsigned long long*, unsigned long*, unsigned long, cudaStream_t"
+      }
+    ]
+  }
+]
