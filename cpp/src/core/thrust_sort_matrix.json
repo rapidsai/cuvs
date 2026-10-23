@@ -1,0 +1,28 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::thrust_sort",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "rmm::exec_policy_nosync const&, int*, int*, cuda::std::greater<int>"
+      },
+      {
+        "parameter_types": "thrust::cuda_cub::par_t const&, __half*, __half*"
+      },
+      {
+        "parameter_types": "thrust::cuda_cub::par_t const&, double*, double*"
+      },
+      {
+        "parameter_types": "thrust::cuda_cub::par_t const&, float*, float*"
+      },
+      {
+        "parameter_types": "rmm::exec_policy_nosync const&, thrust::zip_iterator<cuda::std::tuple<int*, int*, float*>>, thrust::zip_iterator<cuda::std::tuple<int*, int*, float*>>, cuvs::cluster::agglomerative::detail::mst_edge_less"
+      },
+      {
+        "parameter_types": "rmm::exec_policy_nosync const&, thrust::zip_iterator<cuda::std::tuple<long*, long*, float*>>, thrust::zip_iterator<cuda::std::tuple<long*, long*, float*>>, cuvs::cluster::agglomerative::detail::mst_edge_less"
+      }
+    ]
+  }
+]
