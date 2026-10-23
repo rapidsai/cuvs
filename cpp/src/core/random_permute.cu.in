@@ -1,0 +1,20 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <core/cub_ptx_query.hpp>
+#include <core/random_launchers.hpp>
+#include <raft/random/permute.cuh>
+
+namespace cuvs::detail::random {
+
+template <typename T, typename Index>
+void permute(Index* indices, Index columns, Index rows, cudaStream_t stream)
+{
+  raft::random::permute<T, Index, Index>(indices, nullptr, nullptr, columns, rows, true, stream);
+}
+
+@primitive_instantiations@
+
+}  // namespace cuvs::detail::random

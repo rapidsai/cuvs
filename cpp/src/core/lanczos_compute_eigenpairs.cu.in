@@ -1,0 +1,57 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <core/cub_transform_launchers.hpp>
+
+#include <core/cub_ptx_query.hpp>
+#include <core/lanczos.hpp>
+#include <raft/linalg/coalesced_reduction.cuh>
+#include <raft/linalg/map.cuh>
+#include <raft/sparse/solver/lanczos.cuh>
+
+extern template void raft::linalg::detail::map<false, float, int, raft::const_op<float>>(
+  cuda::stream_ref, float*, int, raft::const_op<float>);
+
+extern template void raft::linalg::detail::map<false, float, unsigned int, raft::const_op<float>>(
+  cuda::stream_ref, float*, unsigned int, raft::const_op<float>);
+
+extern template void raft::linalg::detail::map<false, double, int, raft::const_op<double>>(
+  cuda::stream_ref, double*, int, raft::const_op<double>);
+
+extern template void raft::linalg::detail::map<false, double, unsigned int, raft::const_op<double>>(
+  cuda::stream_ref, double*, unsigned int, raft::const_op<double>);
+
+extern template void raft::linalg::detail::
+  coalescedReduction<float, float, unsigned int, raft::sq_op, raft::add_op, raft::sqrt_op>(
+    bool,
+    float*,
+    float const*,
+    unsigned int,
+    unsigned int,
+    float,
+    CUstream_st*,
+    bool,
+    raft::sq_op,
+    raft::add_op,
+    raft::sqrt_op);
+
+namespace cuvs::detail {
+
+template <typename Index, typename T, typename NnzIndex>
+int lanczos_compute_eigenpairs(
+  raft::resources const& res,
+  raft::sparse::solver::lanczos_solver_config<T> const& config,
+  raft::device_coo_matrix_view<T, Index, Index, NnzIndex> matrix,
+  std::optional<raft::device_vector_view<T, uint32_t, raft::row_major>> initial,
+  raft::device_vector_view<T, uint32_t, raft::col_major> values,
+  raft::device_matrix_view<T, uint32_t, raft::col_major> vectors)
+{
+  return raft::sparse::solver::lanczos_compute_eigenpairs(
+    res, config, matrix, initial, values, vectors);
+}
+
+}  // namespace cuvs::detail
+
+@primitive_instantiations@

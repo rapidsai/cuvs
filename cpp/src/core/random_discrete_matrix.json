@@ -1,0 +1,25 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::random::discrete",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "template_arguments": "<int, float, int>",
+        "parameter_types": "raft::resources const&, raft::random::RngState&, raft::device_vector_view<int, int>, raft::device_vector_view<const float, int>"
+      },
+      {
+        "template_arguments": "<int, double, int>",
+        "parameter_types": "raft::resources const&, raft::random::RngState&, raft::device_vector_view<int, int>, raft::device_vector_view<const double, int>"
+      },
+      {
+        "template_arguments": "<int64_t, float, int64_t>",
+        "parameter_types": "raft::resources const&, raft::random::RngState&, raft::device_vector_view<int64_t, int64_t>, raft::device_vector_view<const float, int64_t>"
+      },
+      {
+        "template_arguments": "<int64_t, double, int64_t>",
+        "parameter_types": "raft::resources const&, raft::random::RngState&, raft::device_vector_view<int64_t, int64_t>, raft::device_vector_view<const double, int64_t>"
+      }
+    ]
+  }
+]
