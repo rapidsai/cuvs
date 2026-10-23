@@ -19,6 +19,8 @@
 #include "../../../core/unique_labels_launchers.hpp"
 
 #include "../../../core/thrust_indexed_copy_launchers.hpp"
+
+#include "../../../core/bitmap_csr_conversion_launchers.hpp"
 #include "../../../distance/masked_nn.cuh"
 #include <cuvs/distance/distance.hpp>
 
@@ -334,7 +336,7 @@ void perform_1nn(raft::resources const& handle,
   // the start of color j + 1, i.e., it is the inclusive scan of the sizes of
   // the color components.
   auto colors_group_idxs = raft::make_device_vector<value_idx, value_idx>(handle, n_components + 1);
-  raft::sparse::convert::sorted_coo_to_csr(
+  cuvs::detail::sorted_coo_to_csr(
     colors, n_rows, colors_group_idxs.data_handle(), n_components + 1, stream.get());
 
   auto group_idxs_view = raft::make_device_vector_view<const value_idx, value_idx>(
