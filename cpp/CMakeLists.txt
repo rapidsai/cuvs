@@ -1431,8 +1431,28 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_BINARY_DIR}/src/selection/select_k_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
   )
 
+  # Keep every primitive function in its own CUDA translation unit.
+  foreach(primitive IN ITEMS src/core/reduce_rows_by_key)
+    set(primitive_instantiations)
+    generate_string_matrix(
+      primitive_instantiations
+      MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}_matrix.json"
+      ITEM_FORMAT
+      "template @return_type@ @qualified_function@@template_arguments@(@parameter_types@)@function_qualifiers@@semicolon@"
+      GLUE
+      "\n"
+    )
+    configure_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}.cu.in"
+      "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu" @ONLY
+    )
+    list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
+  endforeach()
+
   add_library(
     cuvs_objs OBJECT
+    ${cuvs_primitive_sources}
     src/cluster/detail/minClusterDistanceCompute.cu
     src/cluster/agglomerative.cu
     ${gmm_inst_files}
