@@ -1,0 +1,82 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::norm",
+    "template_arguments": "<(raft::linalg::NormType)2, (raft::Apply)0>",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<__half const, int, raft::col_major>, raft::device_vector_view<float, int, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<__half const, int, raft::col_major>, raft::device_vector_view<float, int, raft::row_major>, raft::sqrt_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<__half const, int, raft::row_major>, raft::device_vector_view<float, int, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<__half const, int, raft::row_major>, raft::device_vector_view<float, int, raft::row_major>, raft::sqrt_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<__half const, long, raft::col_major>, raft::device_vector_view<float, long, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<__half const, long, raft::col_major>, raft::device_vector_view<float, long, raft::row_major>, raft::sqrt_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<__half const, long, raft::row_major>, raft::device_vector_view<float, long, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<__half const, long, raft::row_major>, raft::device_vector_view<float, long, raft::row_major>, raft::sqrt_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<double const, int, raft::col_major>, raft::device_vector_view<double, int, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<double const, int, raft::col_major>, raft::device_vector_view<double, int, raft::row_major>, raft::sqrt_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<double const, int, raft::row_major>, raft::device_vector_view<double, int, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<double const, int, raft::row_major>, raft::device_vector_view<double, int, raft::row_major>, raft::sqrt_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<double const, long, raft::row_major>, raft::device_vector_view<double, long, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<double const, long, raft::row_major>, raft::device_vector_view<double, long, raft::row_major>, raft::sqrt_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, int, raft::col_major>, raft::device_vector_view<float, int, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, int, raft::col_major>, raft::device_vector_view<float, int, raft::row_major>, raft::sqrt_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, int, raft::row_major>, raft::device_vector_view<float, int, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, int, raft::row_major>, raft::device_vector_view<float, int, raft::row_major>, raft::sqrt_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, long, raft::col_major>, raft::device_vector_view<float, long, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, long, raft::col_major>, raft::device_vector_view<float, long, raft::row_major>, raft::sqrt_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, long, raft::row_major>, raft::device_vector_view<float, long, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, long, raft::row_major>, raft::device_vector_view<float, long, raft::row_major>, raft::sqrt_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, unsigned int, raft::row_major>, raft::device_vector_view<float, unsigned int, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, unsigned int, raft::row_major>, raft::device_vector_view<float, unsigned int, raft::row_major>, raft::sqrt_op"
+      }
+    ]
+  }
+]
