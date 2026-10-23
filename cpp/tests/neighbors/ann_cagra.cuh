@@ -243,7 +243,7 @@ void InitDataset(const raft::resources& handle,
 
     if (metric == cuvs::distance::DistanceType::InnerProduct) {
       // TODO (enp1s0): Change this once row_normalize supports (u)int8 matrices.
-      // https://github.com/rapidsai/raft/issues/2291
+      // https://github.com/NVIDIA/raft/issues/2291
 
       using ComputeT    = float;
       auto dataset_view = raft::make_device_matrix_view(datatset_ptr, size, dim);
@@ -731,6 +731,10 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
       double min_recall = ps.min_recall;
       if (ps.graph_degree < 50) { min_recall *= 0.94; }
       if (ps.graph_degree < 40) { min_recall *= 0.94; }
+      // AUTO may select MULTI_CTA, whose automatic iteration limit is shallower.
+      if (ps.algo == search_algo::MULTI_CTA || ps.algo == search_algo::AUTO) {
+        min_recall *= 0.985;
+      }
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
                                   distances_naive,
@@ -2491,10 +2495,10 @@ inline std::vector<AnnCagraMpInputs> generate_mp_inputs()
                              // Lower than the single-index 0.985 convention. These
                              // low-redundancy single-partition / skewed configs dip
                              // further under filtering, where removing rows thins the
-                             // survivors' graph connectivity; observed recall floors
-                             // around 0.974, so 0.97 leaves headroom for run-to-run
-                             // jitter while still catching real regressions.
-                             /*min_recall*/ 0.97});
+                             // survivors' graph connectivity, so leave headroom for run-to-run
+                             // jitter while still catching real regressions. MULTI_CTA gets extra
+                             // headroom because its automatic iteration limit is shallower.
+                             /*min_recall*/ algo == search_algo::MULTI_CTA ? 0.95 : 0.97});
         }
       }
     }
