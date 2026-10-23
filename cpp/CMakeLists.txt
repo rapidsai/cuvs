@@ -1470,12 +1470,14 @@ if(NOT BUILD_CPU_ONLY)
     src/core/cub_ptx_query.cu
     src/core/cub_reduce_second_tile.cu
     src/core/cub_transform.cu
+    src/core/cub_unique_by_key.cu
     src/core/has_non_finite.cu
     src/core/mask_distance_tile.cu
     src/core/thrust_for_each.cu
     src/core/thrust_reduce_by_key.cu
     src/core/thrust_stable_sort_by_key.cu
     src/core/thrust_transform.cu
+    src/core/thrust_unique_by_key.cu
     src/cluster/detail/minClusterDistanceCompute.cu
     src/cluster/agglomerative.cu
     ${gmm_inst_files}
