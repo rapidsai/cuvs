@@ -1,0 +1,22 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::copy_rows",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<__half const, long, raft::row_major>, raft::device_matrix_view<__half, long, raft::row_major>, raft::device_vector_view<long const, long, raft::row_major>"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, long, raft::row_major>, raft::device_matrix_view<float, long, raft::row_major>, raft::device_vector_view<long const, long, raft::row_major>"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<signed char const, long, raft::row_major>, raft::device_matrix_view<signed char, long, raft::row_major>, raft::device_vector_view<long const, long, raft::row_major>"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<unsigned char const, long, raft::row_major>, raft::device_matrix_view<unsigned char, long, raft::row_major>, raft::device_vector_view<long const, long, raft::row_major>"
+      }
+    ]
+  }
+]
