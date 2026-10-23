@@ -1459,6 +1459,25 @@ if(NOT BUILD_CPU_ONLY)
     list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
   endforeach()
 
+  # Keep every primitive function in its own CUDA translation unit.
+  foreach(primitive IN ITEMS src/core/thrust_copy src/core/thrust_gather)
+    set(primitive_instantiations)
+    generate_string_matrix(
+      primitive_instantiations
+      MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}_matrix.json"
+      ITEM_FORMAT
+      "template @return_type@ @qualified_function@@template_arguments@(@parameter_types@)@function_qualifiers@@semicolon@"
+      GLUE
+      "\n"
+    )
+    configure_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}.cu.in"
+      "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu" @ONLY
+    )
+    list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
+  endforeach()
+
   add_library(
     cuvs_objs OBJECT
     ${cuvs_primitive_sources}
