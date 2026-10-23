@@ -1,0 +1,16 @@
+[
+  {
+    "return_type": "int*",
+    "qualified_function": "cuvs::detail::thrust_copy",
+    "template_arguments": "",
+    "parameter_types": "rmm::exec_policy_nosync const&, cuda::counting_iterator<int, long>, cuda::counting_iterator<int, long>, int*",
+    "function_qualifiers": ""
+  },
+  {
+    "return_type": "long*",
+    "qualified_function": "cuvs::detail::thrust_copy",
+    "template_arguments": "",
+    "parameter_types": "rmm::exec_policy_nosync const&, cuda::counting_iterator<long, __int128>, cuda::counting_iterator<long, __int128>, long*",
+    "function_qualifiers": ""
+  }
+]
