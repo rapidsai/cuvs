@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "../../core/segmented_sort_launchers.hpp"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 
@@ -155,7 +156,7 @@ double trustworthiness_score(const raft::resources& h,
     size_t colSortWorkspaceSize = 0;
     bool bAllocWorkspace        = false;
 
-    raft::matrix::sort_cols_per_row(X_dist.data(),
+    cuvs::detail::sort_cols_per_row(X_dist.data(),
                                     X_ind.data(),
                                     curBatchSize,
                                     n,
@@ -167,7 +168,7 @@ double trustworthiness_score(const raft::resources& h,
     if (bAllocWorkspace) {
       rmm::device_uvector<char> sortColsWorkspace(colSortWorkspaceSize, stream);
 
-      raft::matrix::sort_cols_per_row(X_dist.data(),
+      cuvs::detail::sort_cols_per_row(X_dist.data(),
                                       X_ind.data(),
                                       curBatchSize,
                                       n,

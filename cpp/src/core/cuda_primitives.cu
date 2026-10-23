@@ -378,3 +378,35 @@ template void cuvs::detail::thrust_sort_by_key(
   thrust::device_ptr<long>,
   thrust::device_ptr<long>,
   thrust::zip_iterator<cuda::std::tuple<thrust::device_ptr<long>, thrust::device_ptr<float>>>);
+
+#include "segmented_sort_launchers.hpp"
+#include <raft/matrix/col_wise_sort.cuh>
+#include <raft/matrix/detail/select_k-inl.cuh>
+
+namespace cuvs::detail {
+template <typename InType, typename OutType>
+void sort_cols_per_row(const InType* in,
+                       OutType* out,
+                       int n_rows,
+                       int n_columns,
+                       bool& bAllocWorkspace,
+                       void* workspacePtr,
+                       size_t& workspaceSize,
+                       cudaStream_t stream,
+                       InType* sortedKeys)
+
+{
+  return raft::matrix::sort_cols_per_row(
+    in, out, n_rows, n_columns, bAllocWorkspace, workspacePtr, workspaceSize, stream, sortedKeys);
+}
+
+template <typename... Args, typename>
+void sort_cols_per_row(Args... args)
+
+{
+  return raft::matrix::sort_cols_per_row<Args...>(args...);
+}
+
+}  // namespace cuvs::detail
+template void cuvs::detail::sort_cols_per_row(
+  float const*, int*, int, int, bool&, void*, unsigned long&, CUstream_st*, float*);
