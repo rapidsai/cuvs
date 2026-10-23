@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../cagra_padded_build_helpers.cuh"
+#include "../cagra_padded_build_helpers.hpp"
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/preprocessing/quantize/pq.hpp>
 
