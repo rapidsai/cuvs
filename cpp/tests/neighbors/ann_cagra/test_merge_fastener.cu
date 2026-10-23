@@ -10,7 +10,7 @@
 
 #include "../../../src/neighbors/detail/cagra/cagra_merge.cuh"
 #include "../ann_cagra.cuh"
-#include "../cagra_padded_build_helpers.cuh"
+#include "../cagra_padded_build_helpers.hpp"
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
