@@ -1433,6 +1433,7 @@ if(NOT BUILD_CPU_ONLY)
 
   add_library(
     cuvs_objs OBJECT
+    src/neighbors/detail/cagra/graph_optimization.cu
     src/core/cuda_primitives.cu
     src/cluster/detail/minClusterDistanceCompute.cu
     src/cluster/agglomerative.cu
