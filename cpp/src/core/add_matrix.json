@@ -1,0 +1,28 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::add",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "double*, double const*, double const*, int, CUstream_st*"
+      },
+      {
+        "parameter_types": "float*, float const*, float const*, int, CUstream_st*"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_vector_view<unsigned int const, long, raft::row_major>, raft::device_vector_view<unsigned int const, long, raft::row_major>, raft::device_vector_view<unsigned int, long, raft::row_major>"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_vector_view<unsigned int const, unsigned int, raft::row_major>, raft::device_vector_view<unsigned int const, unsigned int, raft::row_major>, raft::device_vector_view<unsigned int, unsigned int, raft::row_major>"
+      },
+      {
+        "parameter_types": "unsigned int*, unsigned int const*, unsigned int const*, unsigned int, CUstream_st*"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_vector_view<unsigned long long const, long, raft::row_major>, raft::device_vector_view<unsigned long long const, long, raft::row_major>, raft::device_vector_view<unsigned long long, long, raft::row_major>"
+      }
+    ]
+  }
+]
