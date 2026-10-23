@@ -5,6 +5,10 @@
 #pragma once
 
 #include "../../core/map_launchers.hpp"
+
+#include "../../core/gather_launchers.hpp"
+
+#include "../../core/cub_runtime_launchers.hpp"
 #include "../../core/matrix_broadcast_launchers.hpp"
 #include "../../core/nvtx.hpp"
 #include "../../core/reduction_launchers.hpp"
@@ -264,7 +268,7 @@ void kmeansPlusPlus(raft::resources const& handle,
     // distance to the nearest existing cluster
 
     raft::random::discrete(handle, rng, indices_view, const_weights_view);
-    raft::matrix::gather(handle, const_X_view, const_indices_view, candidates_view);
+    cuvs::detail::gather(handle, const_X_view, const_indices_view, candidates_view);
 
     // Calculate pairwise distance between X and the centroid candidates
     // Output - pwd [n_trials x n_samples]
@@ -299,23 +303,23 @@ void kmeansPlusPlus(raft::resources const& handle,
     {
       // Determine temporary device storage requirements
       size_t temp_storage_bytes = 0;
-      cub::DeviceReduce::ArgMin(nullptr,
-                                temp_storage_bytes,
-                                costPerCandidate.data_handle(),
-                                minClusterIndexAndDistance.data(),
-                                costPerCandidate.extent(0),
-                                stream);
+      cuvs::detail::cub_argmin(nullptr,
+                               temp_storage_bytes,
+                               costPerCandidate.data_handle(),
+                               minClusterIndexAndDistance.data(),
+                               costPerCandidate.extent(0),
+                               stream);
 
       // Allocate temporary storage
       workspace.resize(temp_storage_bytes, stream);
 
       // Run argmin-reduction
-      cub::DeviceReduce::ArgMin(workspace.data(),
-                                temp_storage_bytes,
-                                costPerCandidate.data_handle(),
-                                minClusterIndexAndDistance.data(),
-                                costPerCandidate.extent(0),
-                                stream);
+      cuvs::detail::cub_argmin(workspace.data(),
+                               temp_storage_bytes,
+                               costPerCandidate.data_handle(),
+                               minClusterIndexAndDistance.data(),
+                               costPerCandidate.extent(0),
+                               stream);
 
       int bestCandidateIdx = -1;
       raft::copy(handle,

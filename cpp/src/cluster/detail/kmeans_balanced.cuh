@@ -6,6 +6,8 @@
 #pragma once
 
 #include "../../core/map_launchers.hpp"
+
+#include "../../core/gather_launchers.hpp"
 #include "../../core/matrix_broadcast_launchers.hpp"
 #include "../../core/reduction_launchers.hpp"
 #include "kmeans_common.cuh"
@@ -1425,7 +1427,7 @@ auto build_fine_clusters(const raft::resources& handle,
                    "Number of fine clusters must be non-zero for a non-empty mesocluster");
     }
 
-    raft::matrix::gather(dataset_mptr, dim, n_rows, mc_trainset_ids, k, mc_trainset, stream.get());
+    cuvs::detail::gather(dataset_mptr, dim, n_rows, mc_trainset_ids, k, mc_trainset, stream.get());
     if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
         params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
         params.metric == cuvs::distance::DistanceType::CosineExpanded) {

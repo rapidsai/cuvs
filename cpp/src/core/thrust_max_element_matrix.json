@@ -1,0 +1,16 @@
+[
+  {
+    "return_type": "thrust::device_ptr<int const>",
+    "qualified_function": "cuvs::detail::thrust_max_element",
+    "template_arguments": "",
+    "parameter_types": "rmm::exec_policy_nosync const&, thrust::device_ptr<int const>, thrust::device_ptr<int const>",
+    "function_qualifiers": ""
+  },
+  {
+    "return_type": "unsigned int const*",
+    "qualified_function": "cuvs::detail::thrust_max_element",
+    "template_arguments": "",
+    "parameter_types": "rmm::exec_policy const&, unsigned int const*, unsigned int const*",
+    "function_qualifiers": ""
+  }
+]

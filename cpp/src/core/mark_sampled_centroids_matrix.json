@@ -1,0 +1,22 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::mark_sampled_centroids",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "raft::resources const&, raft::KeyValuePair<long, double>*, int, unsigned char*"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::KeyValuePair<long, double>*, long, unsigned char*"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::KeyValuePair<long, float>*, int, unsigned char*"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::KeyValuePair<long, float>*, long, unsigned char*"
+      }
+    ]
+  }
+]

@@ -1,0 +1,110 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "raft::matrix::detail::gatherImpl",
+    "template_arguments": "< thrust::transform_iterator<cuvs::spatial::knn::detail::utils::mapping<float>, float const*, thrust::use_default, float>, long const*, long const*, raft::const_op<bool>, raft::identity_op, float*, long>",
+    "parameter_types": "thrust::transform_iterator<cuvs::spatial::knn::detail::utils::mapping<float>, float const*, thrust::use_default, float>, long, long, long, long const*, long const*, long, float*, raft::const_op<bool>, raft::identity_op, cudaStream_t",
+    "function_qualifiers": ""
+  },
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::detail::gather",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "__half const*, long, long, long*, long, __half*, CUstream_st*"
+      },
+      {
+        "parameter_types": "double*, int, int, int*, int, double*, CUstream_st*"
+      },
+      {
+        "parameter_types": "double*, int, int, raft::KeyValuePair<long, double>*, int, double*, raft::key_op, CUstream_st*"
+      },
+      {
+        "parameter_types": "double*, long, long, long*, long, double*, CUstream_st*"
+      },
+      {
+        "parameter_types": "double*, long, long, raft::KeyValuePair<long, double>*, long, double*, raft::key_op, CUstream_st*"
+      },
+      {
+        "parameter_types": "float const*, long, long, long*, long, float*, CUstream_st*"
+      },
+      {
+        "parameter_types": "float*, int, int, int*, int, float*, CUstream_st*"
+      },
+      {
+        "parameter_types": "float*, int, int, raft::KeyValuePair<long, float>*, int, float*, raft::key_op, CUstream_st*"
+      },
+      {
+        "parameter_types": "float*, long, long, long*, long, float*, CUstream_st*"
+      },
+      {
+        "parameter_types": "float*, long, long, raft::KeyValuePair<long, float>*, long, float*, raft::key_op, CUstream_st*"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<double const, int, raft::row_major>, raft::device_vector_view<int const, int, raft::row_major>, raft::device_matrix_view<double, int, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<double const, long, raft::row_major>, raft::device_vector_view<long const, long, raft::row_major>, raft::device_matrix_view<double, long, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, int, raft::row_major>, raft::device_vector_view<int const, int, raft::row_major>, raft::device_matrix_view<float, int, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, long, raft::row_major>, raft::device_vector_view<long const, long, raft::row_major>, raft::device_matrix_view<float, long, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float const, long, raft::row_major>, raft::device_vector_view<unsigned int const, long, raft::row_major>, raft::device_matrix_view<float, long, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<unsigned int const, long, raft::row_major>, raft::device_vector_view<long const, long, raft::row_major>, raft::device_matrix_view<unsigned int, long, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "signed char const*, long, long, long*, long, signed char*, CUstream_st*"
+      },
+      {
+        "parameter_types": "thrust::transform_iterator<cuvs::spatial::knn::detail::utils::mapping<float>, float const*, thrust::use_default, float>, long, long, long const*, long, float*, CUstream_st*"
+      },
+      {
+        "parameter_types": "unsigned char const*, long, long, long*, long, unsigned char*, CUstream_st*"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<__half const, long, raft::row_major>, raft::device_vector_view<long const, long, raft::row_major>, raft::device_matrix_view<__half, long, raft::row_major>, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float, int, raft::row_major>, raft::device_vector_view<int const, int, raft::row_major>, int, raft::identity_op"
+      },
+      {
+        "parameter_types": "raft::resources const&, raft::device_matrix_view<float, long, raft::row_major>, raft::device_vector_view<long const, long, raft::row_major>, long, raft::identity_op"
+      }
+    ]
+  },
+  {
+    "return_type": "void",
+    "qualified_function": "raft::matrix::detail::gatherImpl",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "template_arguments": "<__half*, long const*, long const*, raft::const_op<bool>, raft::identity_op, __half*, long>",
+        "parameter_types": "__half*, long, long, long, long const*, long const*, long, __half*, raft::const_op<bool>, raft::identity_op, cudaStream_t"
+      },
+      {
+        "template_arguments": "<float*, long const*, long const*, raft::const_op<bool>, raft::identity_op, float*, long>",
+        "parameter_types": "float*, long, long, long, long const*, long const*, long, float*, raft::const_op<bool>, raft::identity_op, cudaStream_t"
+      },
+      {
+        "template_arguments": "<float*, int const*, int const*, raft::const_op<bool>, raft::identity_op, float*, int>",
+        "parameter_types": "float*, int, int, int, int const*, int const*, int, float*, raft::const_op<bool>, raft::identity_op, cudaStream_t"
+      },
+      {
+        "template_arguments": "<double*, long const*, long const*, raft::const_op<bool>, raft::identity_op, double*, long>",
+        "parameter_types": "double*, long, long, long, long const*, long const*, long, double*, raft::const_op<bool>, raft::identity_op, cudaStream_t"
+      },
+      {
+        "template_arguments": "<double*, int const*, int const*, raft::const_op<bool>, raft::identity_op, double*, int>",
+        "parameter_types": "double*, int, int, int, int const*, int const*, int, double*, raft::const_op<bool>, raft::identity_op, cudaStream_t"
+      }
+    ]
+  }
+]

@@ -1,0 +1,102 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <core/cub_ptx_query.hpp>
+
+#include <raft/core/bitset.cuh>
+
+#include <cuco/detail/roaring_bitmap/util.cuh>
+
+#include <core/cub_compact_launchers.hpp>
+#include <core/cub_device_select_if_launchers.hpp>
+
+#include <core/cub_device_flagged_if_launchers.hpp>
+#include <core/cub_device_unique_launchers.hpp>
+
+namespace cuvs::cluster::kmeans::detail {
+
+template <typename DataT, typename IndexT>
+__host__ __device__
+SamplingOp<DataT, IndexT>::SamplingOp(DataT c, double l, IndexT k, DataT* rand, uint8_t* ptr)
+  : cluster_cost(c), oversampling_factor(l), n_clusters(k), rnd(rand), flag(ptr)
+{
+}
+
+template <typename DataT, typename IndexT>
+__host__ __device__ __forceinline__ bool SamplingOp<DataT, IndexT>::operator()(
+  const raft::KeyValuePair<ptrdiff_t, DataT>& a) const
+{
+  DataT prob_threshold = (DataT)rnd[a.key];
+  DataT prob_x         = ((oversampling_factor * n_clusters * a.value) / cluster_cost);
+  return !flag[a.key] && (prob_x > prob_threshold);
+}
+
+template struct SamplingOp<float, int>;
+
+template struct SamplingOp<float, int64_t>;
+
+template struct SamplingOp<double, int>;
+
+template struct SamplingOp<double, int64_t>;
+
+}  // namespace cuvs::cluster::kmeans::detail
+namespace cuvs::detail {
+template <class T, class Index, class Bits, class Distance>
+__device__ __forceinline__ bool bitset_row_filter<T, Index, Bits, Distance>::operator()(
+  Index index) const
+{
+  return filter_view.test(index);
+}
+// Equivalent leaf predicate to cuco::experimental::detail::is_container_start.
+// The vendor predicate's state is reduced to its first, immutable num_indices field.
+template <class IndexIt>
+__device__ __forceinline__ bool container_start<IndexIt>::operator()(long index) const
+{
+  if (index >= *num_indices) return false;
+  if (index == 0) return true;
+  using metadata = cuco::experimental::detail::roaring_bitmap_metadata<cuda::std::uint32_t>;
+  return metadata::container_key(indices[index]) != metadata::container_key(indices[index - 1]);
+}
+template <cub::SelectImpl Selection,
+          class Input,
+          class Flags,
+          class Output,
+          class Count,
+          class Select,
+          class Equal,
+          class Offset,
+          class Policy>
+cudaError_t cub_select_dispatch(void* storage,
+                                size_t& bytes,
+                                Input input,
+                                Flags flags,
+                                Output output,
+                                Count count,
+                                Select select,
+                                Equal equal,
+                                Offset items,
+                                cudaStream_t stream,
+                                Policy policy)
+{
+  return cub::detail::select::dispatch<Selection>(
+    storage, bytes, input, flags, output, count, select, equal, items, stream, policy);
+}
+}  // namespace cuvs::detail
+@primitive_instantiations@
+
+  template <>
+  CUB_RUNTIME_FUNCTION cuvs::detail::unique_launch::compact32_pointer
+  cuvs::detail::unique_launch::unique_0::CompactInitKernel()
+{
+  return &cub::detail::scan::DeviceCompactInitKernel<cub::ScanTileState<unsigned int>,
+                                                     unsigned int*>;
+}
+template <>
+CUB_RUNTIME_FUNCTION cuvs::detail::unique_launch::compact64_pointer
+cuvs::detail::unique_launch::unique_1::CompactInitKernel()
+{
+  return &cub::detail::scan::DeviceCompactInitKernel<cub::ScanTileState<unsigned long long>,
+                                                     unsigned long*>;
+}

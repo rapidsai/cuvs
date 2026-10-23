@@ -4,6 +4,10 @@
  */
 
 #include "../../../core/map_launchers.hpp"
+
+#include "../../../core/gather_launchers.hpp"
+
+#include "../../../core/cub_runtime_launchers.hpp"
 #include "../../../core/matrix_broadcast_launchers.hpp"
 #include "../../../core/reduction_launchers.hpp"
 #include <cub/device/device_histogram.cuh>
@@ -101,16 +105,16 @@ void compute_cluster_offsets(raft::resources const& dev_resources,
 
   temp_storage_bytes = 0;
 
-  cub::DeviceReduce::Max(
+  cuvs::detail::cub_max(
     nullptr, temp_storage_bytes, cluster_sizes.data_handle(), d_max_cluster_size.data(), num_items);
 
   rmm::device_uvector<int64_t> temp_storage_max(temp_storage_bytes, stream, device_memory);
 
-  cub::DeviceReduce::Max(temp_storage_max.data(),
-                         temp_storage_bytes,
-                         cluster_sizes.data_handle(),
-                         d_max_cluster_size.data(),
-                         num_items);
+  cuvs::detail::cub_max(temp_storage_max.data(),
+                        temp_storage_bytes,
+                        cluster_sizes.data_handle(),
+                        d_max_cluster_size.data(),
+                        num_items);
 
   max_cluster_size = d_max_cluster_size.value(stream);
 
@@ -545,7 +549,7 @@ class cluster_loader {
       auto dataset_view =
         raft::make_device_matrix_view<const T, int64_t>(dataset_ptr_, n_rows_, dim_);
 
-      raft::matrix::gather(res, dataset_view, cluster_ids, cluster_vectors);
+      cuvs::detail::gather(res, dataset_view, cluster_ids, cluster_vectors);
     }
 
     copy_idx_ = cluster_idx;
