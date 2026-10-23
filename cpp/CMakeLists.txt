@@ -1450,6 +1450,32 @@ if(NOT BUILD_CPU_ONLY)
     list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
   endforeach()
 
+  # Keep every primitive function in its own CUDA translation unit.
+  foreach(
+    primitive IN
+    ITEMS src/selection/select_k_dense_launch
+          src/selection/select_k_dense_view_launch
+          src/selection/select_k_radix_launch
+          src/selection/select_k_segmented_sort_launch
+          src/selection/select_k_warpsort_launch
+  )
+    set(primitive_instantiations)
+    generate_string_matrix(
+      primitive_instantiations
+      MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}_matrix.json"
+      ITEM_FORMAT
+      "template @return_type@ @qualified_function@@template_arguments@(@parameter_types@)@function_qualifiers@@semicolon@"
+      GLUE
+      "\n"
+    )
+    configure_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}.cu.in"
+      "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu" @ONLY
+    )
+    list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
+  endforeach()
+
   add_library(
     cuvs_objs OBJECT
     ${cuvs_primitive_sources}
@@ -1457,6 +1483,7 @@ if(NOT BUILD_CPU_ONLY)
     src/core/cub_ptx_query.cu
     src/core/multiply_scalar.cu
     src/core/power_scalar.cu
+    src/selection/select_k_csr_launch.cu
     src/cluster/detail/minClusterDistanceCompute.cu
     src/cluster/agglomerative.cu
     ${gmm_inst_files}
