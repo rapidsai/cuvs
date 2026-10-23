@@ -6,6 +6,7 @@
 #pragma once
 
 #include "../../core/nvtx.hpp"
+#include "../../core/thrust_fill_launchers.hpp"
 #include "../detail/ann_utils.cuh"
 #include "../ivf_flat/ivf_flat_build.cuh"
 #include "../ivf_flat/ivf_flat_interleaved_scan_ext.cuh"
@@ -88,7 +89,7 @@ void refine_device(
   rmm::device_uvector<uint32_t> chunk_index(n_queries, raft::resource::get_cuda_stream(handle));
 
   // we know that each cluster has exactly n_candidates entries
-  raft::matrix::fill(
+  cuvs::detail::matrix_fill(
     handle, raft::make_device_vector_view(chunk_index.data(), n_queries), uint32_t(n_candidates));
 
   uint32_t* neighbors_uint32 = nullptr;

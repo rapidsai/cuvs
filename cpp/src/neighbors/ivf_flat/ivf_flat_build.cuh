@@ -6,6 +6,7 @@
 #pragma once
 
 #include "../../core/nvtx.hpp"
+#include "../../core/thrust_fill_launchers.hpp"
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
 
@@ -497,7 +498,8 @@ inline void fill_refinement_index(raft::resources const& handle,
   // Update the pointers and the sizes
   ivf::detail::recompute_internal_state(handle, *refinement_index);
 
-  raft::matrix::fill(handle, raft::make_device_vector_view(list_sizes_ptr, n_lists), uint32_t(0));
+  cuvs::detail::matrix_fill(
+    handle, raft::make_device_vector_view(list_sizes_ptr, n_lists), uint32_t(0));
 
   const dim3 block_dim(256);
   const dim3 grid_dim(raft::ceildiv<IdxT>(n_queries * n_candidates, block_dim.x));

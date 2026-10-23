@@ -378,3 +378,228 @@ template void cuvs::detail::thrust_sort_by_key(
   thrust::device_ptr<long>,
   thrust::device_ptr<long>,
   thrust::zip_iterator<cuda::std::tuple<thrust::device_ptr<long>, thrust::device_ptr<float>>>);
+
+#include "thrust_fill_launchers.hpp"
+#include <cuvs/core/cuda_fp16.hpp>
+#include <raft/matrix/init.cuh>
+#include <rmm/exec_policy.hpp>
+#include <thrust/fill.h>
+#include <thrust/sequence.h>
+#include <thrust/system/cuda/detail/tabulate.h>
+
+namespace cuvs::detail {
+template <typename Policy, typename Iterator, typename Value>
+void thrust_fill(Policy const& policy, Iterator first, Iterator last, Value const& value)
+{
+  return thrust::fill(policy, first, last, value);
+}
+
+template <typename Policy, typename Iterator, typename Count, typename Value>
+Iterator thrust_fill_n(Policy const& policy, Iterator first, Count count, Value const& value)
+{
+  return thrust::fill_n(policy, first, count, value);
+}
+
+template <typename Policy, typename Iterator>
+void thrust_sequence(Policy const& policy, Iterator first, Iterator last)
+{
+  return thrust::sequence(policy, first, last);
+}
+
+template <typename Policy, typename Iterator, typename Init>
+void thrust_sequence(Policy const& policy, Iterator first, Iterator last, Init init)
+{
+  return thrust::sequence(policy, first, last, init);
+}
+
+template <typename Policy, typename Iterator, typename Init, typename Step>
+void thrust_sequence(Policy const& policy, Iterator first, Iterator last, Init init, Step step)
+{
+  return thrust::sequence(policy, first, last, init, step);
+}
+
+template <typename math_t, typename extents, typename layout>
+void matrix_fill(raft::resources const& handle,
+                 raft::device_mdspan<const math_t, extents, layout> in,
+                 raft::device_mdspan<math_t, extents, layout> out,
+                 raft::host_scalar_view<math_t> scalar)
+
+{
+  return raft::matrix::fill(handle, in, out, scalar);
+}
+
+template <typename math_t, typename extents, typename layout>
+void matrix_fill(raft::resources const& handle,
+                 raft::device_mdspan<math_t, extents, layout> inout,
+                 math_t scalar)
+
+{
+  return raft::matrix::fill(handle, inout, scalar);
+}
+
+}  // namespace cuvs::detail
+template float* cuvs::detail::thrust_fill_n(rmm::exec_policy_nosync const&,
+                                            float*,
+                                            unsigned long,
+                                            float const&);
+
+template unsigned int* cuvs::detail::thrust_fill_n(rmm::exec_policy_nosync const&,
+                                                   unsigned int*,
+                                                   unsigned long,
+                                                   unsigned int const&);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&,
+  cuda::std::mdspan<
+    double,
+    cuda::std::extents<unsigned int, 1ul>,
+    cuda::std::layout_right,
+    raft::host_device_accessor<cuda::std::default_accessor<double>, (raft::memory_type)2>>,
+  double);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&,
+  cuda::std::mdspan<
+    float,
+    cuda::std::extents<unsigned int, 1ul>,
+    cuda::std::layout_right,
+    raft::host_device_accessor<cuda::std::default_accessor<float>, (raft::memory_type)2>>,
+  float);
+
+template void cuvs::detail::matrix_fill(raft::resources const&,
+                                        raft::device_matrix_view<double, int, raft::row_major>,
+                                        double);
+
+template void cuvs::detail::matrix_fill(raft::resources const&,
+                                        raft::device_matrix_view<double, long, raft::row_major>,
+                                        double);
+
+template void cuvs::detail::matrix_fill(raft::resources const&,
+                                        raft::device_matrix_view<float, int, raft::row_major>,
+                                        float);
+
+template void cuvs::detail::matrix_fill(raft::resources const&,
+                                        raft::device_matrix_view<float, long, raft::row_major>,
+                                        float);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&, raft::device_matrix_view<float, unsigned long, raft::row_major>, float);
+
+template void cuvs::detail::matrix_fill(raft::resources const&,
+                                        raft::device_matrix_view<int, long, raft::row_major>,
+                                        int);
+
+template void cuvs::detail::matrix_fill(raft::resources const&,
+                                        raft::device_matrix_view<long, long, raft::row_major>,
+                                        long);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&, raft::device_matrix_view<long, unsigned long, raft::row_major>, long);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&,
+  raft::device_matrix_view<unsigned int, long, raft::row_major>,
+  unsigned int);
+
+template void cuvs::detail::matrix_fill(raft::resources const&,
+                                        raft::device_vector_view<bool, long, raft::row_major>,
+                                        bool);
+
+template void cuvs::detail::matrix_fill(raft::resources const&,
+                                        raft::device_vector_view<double, int, raft::row_major>,
+                                        double);
+
+template void cuvs::detail::matrix_fill(raft::resources const&,
+                                        raft::device_vector_view<double, long, raft::row_major>,
+                                        double);
+
+template void cuvs::detail::matrix_fill(raft::resources const&,
+                                        raft::device_vector_view<float, int, raft::row_major>,
+                                        float);
+
+template void cuvs::detail::matrix_fill(raft::resources const&,
+                                        raft::device_vector_view<float, long, raft::row_major>,
+                                        float);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&, raft::device_vector_view<float, unsigned long, raft::row_major>, float);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&, raft::device_vector_view<int, unsigned long, raft::row_major>, int);
+
+template void cuvs::detail::matrix_fill(raft::resources const&,
+                                        raft::device_vector_view<long, long, raft::row_major>,
+                                        long);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&, raft::device_vector_view<long, unsigned int, raft::row_major>, long);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&, raft::device_vector_view<long, unsigned long, raft::row_major>, long);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&,
+  raft::device_vector_view<raft::KeyValuePair<int, double>, int, raft::row_major>,
+  raft::KeyValuePair<int, double>);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&,
+  raft::device_vector_view<raft::KeyValuePair<int, float>, int, raft::row_major>,
+  raft::KeyValuePair<int, float>);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&,
+  raft::device_vector_view<raft::KeyValuePair<long, double>, long, raft::row_major>,
+  raft::KeyValuePair<long, double>);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&,
+  raft::device_vector_view<raft::KeyValuePair<long, float>, long, raft::row_major>,
+  raft::KeyValuePair<long, float>);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&,
+  raft::device_vector_view<unsigned int, long, raft::row_major>,
+  unsigned int);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&,
+  raft::device_vector_view<unsigned int, unsigned int, raft::row_major>,
+  unsigned int);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&,
+  raft::device_vector_view<unsigned int, unsigned long, raft::row_major>,
+  unsigned int);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&,
+  raft::device_vector_view<unsigned long, int, raft::row_major>,
+  unsigned long);
+
+template void cuvs::detail::thrust_fill(rmm::exec_policy_nosync const&, int*, int*, int const&);
+
+template void cuvs::detail::thrust_fill(thrust::cuda_cub::execute_on_stream const&,
+                                        __half*,
+                                        __half*,
+                                        __half const&);
+
+template void cuvs::detail::thrust_fill(thrust::cuda_cub::execute_on_stream const&,
+                                        double*,
+                                        double*,
+                                        double const&);
+
+template void cuvs::detail::thrust_fill(thrust::cuda_cub::execute_on_stream const&,
+                                        float*,
+                                        float*,
+                                        float const&);
+
+template void cuvs::detail::thrust_fill(thrust::cuda_cub::execute_on_stream const&,
+                                        int*,
+                                        int*,
+                                        int const&);
+
+template void cuvs::detail::matrix_fill(
+  raft::resources const&,
+  raft::device_vector_view<unsigned long, unsigned long, raft::row_major>,
+  unsigned long);
