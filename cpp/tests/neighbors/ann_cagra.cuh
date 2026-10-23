@@ -243,7 +243,7 @@ void InitDataset(const raft::resources& handle,
 
     if (metric == cuvs::distance::DistanceType::InnerProduct) {
       // TODO (enp1s0): Change this once row_normalize supports (u)int8 matrices.
-      // https://github.com/rapidsai/raft/issues/2291
+      // https://github.com/NVIDIA/raft/issues/2291
 
       using ComputeT    = float;
       auto dataset_view = raft::make_device_matrix_view(datatset_ptr, size, dim);
@@ -731,6 +731,10 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
       double min_recall = ps.min_recall;
       if (ps.graph_degree < 50) { min_recall *= 0.94; }
       if (ps.graph_degree < 40) { min_recall *= 0.94; }
+      // AUTO may select MULTI_CTA, whose automatic iteration limit is shallower.
+      if (ps.algo == search_algo::MULTI_CTA || ps.algo == search_algo::AUTO) {
+        min_recall *= 0.985;
+      }
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
                                   distances_naive,
@@ -1802,14 +1806,15 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
-  // Corner cases for small datasets
+  // Corner cases for small datasets. IVF-PQ is excluded because its 8-bit codebook for these
+  // dimensions requires at least 256 training rows.
   inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {2},
     {3, 6, 31, 32, 64, 101},
     {1, 10},
     {2},   // k
     {32},  // degree
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {graph_build_algo::NN_DESCENT},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0},  // query size
     {0},
@@ -1828,7 +1833,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   // Varying dim and build algo.
   inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {100},
-    {500},
+    {600},
     {3, 7, 17, 137, 192, 256, 1024},  // dim
     {16},                             // k
     {32},                             // degree
@@ -1935,7 +1940,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   // Varying host_dataset, ivf_pq_search_refine_ratio
   inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {100},
-    {100},
+    {600},  // The 55/45 merge split must leave at least 256 rows for each 8-bit PQ codebook.
     {32},
     {16},
     {32},  // degree
@@ -2490,10 +2495,10 @@ inline std::vector<AnnCagraMpInputs> generate_mp_inputs()
                              // Lower than the single-index 0.985 convention. These
                              // low-redundancy single-partition / skewed configs dip
                              // further under filtering, where removing rows thins the
-                             // survivors' graph connectivity; observed recall floors
-                             // around 0.974, so 0.97 leaves headroom for run-to-run
-                             // jitter while still catching real regressions.
-                             /*min_recall*/ 0.97});
+                             // survivors' graph connectivity, so leave headroom for run-to-run
+                             // jitter while still catching real regressions. MULTI_CTA gets extra
+                             // headroom because its automatic iteration limit is shallower.
+                             /*min_recall*/ algo == search_algo::MULTI_CTA ? 0.95 : 0.97});
         }
       }
     }

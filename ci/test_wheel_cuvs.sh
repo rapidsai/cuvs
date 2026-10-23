@@ -13,7 +13,7 @@ LIBCUVS_WHEELHOUSE=$(rapids-download-from-github "$(rapids-artifact-name wheel_c
 CUVS_WHEELHOUSE=$(rapids-download-from-github "$(rapids-artifact-name wheel_python cuvs cuvs --stable --cuda "$RAPIDS_CUDA_VERSION")")
 
 # generate constraints (possibly pinning to oldest support versions of dependencies)
-rapids-generate-pip-constraints test_python "${PIP_CONSTRAINT}"
+rapids-generate-pip-constraints test_python "${PIP_CONSTRAINT}" constraints
 
 python -m venv libcuvs-env
 . libcuvs-env/bin/activate
@@ -38,4 +38,4 @@ rapids-pip-retry install \
     "${LIBCUVS_WHEELHOUSE}"/libcuvs*.whl \
     "$(echo "${CUVS_WHEELHOUSE}"/cuvs*.whl)[test]"
 
-python -m pytest ./python/cuvs/cuvs/tests
+timeout -v --signal=SIGINT --kill-after=60s 40m python -m pytest ./python/cuvs/cuvs/tests
