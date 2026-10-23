@@ -1,0 +1,34 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "GNND<const float, int>::add_reverse_edges",
+    "template_arguments": "",
+    "parameter_types": "int*, int*, int*, int2*, cudaStream_t",
+    "function_qualifiers": "",
+    "namespace_context": "cuvs::neighbors::nn_descent::detail"
+  },
+  {
+    "return_type": "void",
+    "qualified_function": "GNND<const __half, int>::add_reverse_edges",
+    "template_arguments": "",
+    "parameter_types": "int*, int*, int*, int2*, cudaStream_t",
+    "function_qualifiers": "",
+    "namespace_context": "cuvs::neighbors::nn_descent::detail"
+  },
+  {
+    "return_type": "void",
+    "qualified_function": "GNND<const int8_t, int>::add_reverse_edges",
+    "template_arguments": "",
+    "parameter_types": "int*, int*, int*, int2*, cudaStream_t",
+    "function_qualifiers": "",
+    "namespace_context": "cuvs::neighbors::nn_descent::detail"
+  },
+  {
+    "return_type": "void",
+    "qualified_function": "GNND<const uint8_t, int>::add_reverse_edges",
+    "template_arguments": "",
+    "parameter_types": "int*, int*, int*, int2*, cudaStream_t",
+    "function_qualifiers": "",
+    "namespace_context": "cuvs::neighbors::nn_descent::detail"
+  }
+]
