@@ -148,7 +148,7 @@ abstract class CuVSFilterCodec extends FilterCodec {
    * Set the {@link KnnVectorsFormat}.
    *
    * @param format the {@link KnnVectorsFormat} to set
-   * @deprecated use {@link #setKnnVectorsFormat(KnnVectorsFormat)}, which matches the name of
+   * @deprecated use {@code setKnnVectorsFormat(KnnVectorsFormat)}, which matches the name of
    *     {@link #knnVectorsFormat()}
    */
   @Deprecated(since = "26.12", forRemoval = true)
