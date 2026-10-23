@@ -162,9 +162,14 @@ def get_index_name_prefix(algo: str) -> str:
     also the name its build results are stored under. ``faiss_cpu_hnsw_cagra``
     only searches indexes built by ``faiss_gpu_cagra_hnsw``; every other
     algorithm builds its own indexes.
+
+    ``algo`` may include a group suffix, as in result CSVs for groups other
+    than ``base``: ``faiss_cpu_hnsw_cagra_large`` maps to
+    ``faiss_gpu_cagra_hnsw_large``.
     """
-    if algo == "faiss_cpu_hnsw_cagra":
-        return "faiss_gpu_cagra_hnsw"
+    search_algo, build_algo = "faiss_cpu_hnsw_cagra", "faiss_gpu_cagra_hnsw"
+    if algo == search_algo or algo.startswith(f"{search_algo}_"):
+        return build_algo + algo[len(search_algo) :]
     return algo
 
 

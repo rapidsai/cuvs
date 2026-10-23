@@ -35,6 +35,13 @@ auto parse_metric_type(cuvs::bench::Metric metric) -> faiss::MetricType
     throw std::runtime_error("faiss supports only metric type of inner product and L2");
   }
 }
+
+auto metric_type_name(faiss::MetricType metric_type) -> std::string
+{
+  if (metric_type == faiss::METRIC_INNER_PRODUCT) { return "inner product"; }
+  if (metric_type == faiss::METRIC_L2) { return "L2"; }
+  return std::to_string(metric_type);
+}
 }  // namespace
 
 namespace cuvs::bench {
@@ -191,6 +198,14 @@ void faiss_cpu<T>::load_(const std::string& file)
   if (typed == nullptr) {
     throw std::runtime_error("'" + file + "' does not contain a " + typeid(Index).name() +
                              " (found " + typeid(*loaded).name() + ")");
+  }
+  if (typed->d != this->dim_) {
+    throw std::runtime_error("'" + file + "' has dimension " + std::to_string(typed->d) +
+                             ", but the dataset has dimension " + std::to_string(this->dim_));
+  }
+  if (typed->metric_type != metric_type_) {
+    throw std::runtime_error("'" + file + "' uses the " + metric_type_name(typed->metric_type) +
+                             " metric, but the dataset uses " + metric_type_name(metric_type_));
   }
   loaded.release();
   index_.reset(typed);

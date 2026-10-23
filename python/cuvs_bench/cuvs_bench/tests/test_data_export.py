@@ -7,6 +7,7 @@ import json
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from cuvs_bench.backends.base import BuildResult, SearchResult
 from cuvs_bench.orchestrator.config_loaders import (
@@ -28,6 +29,10 @@ def test_get_index_name_prefix():
         get_index_name_prefix("faiss_cpu_hnsw_cagra") == "faiss_gpu_cagra_hnsw"
     )
     assert get_index_name_prefix("cuvs_cagra") == "cuvs_cagra"
+    assert (
+        get_index_name_prefix("faiss_cpu_hnsw_cagra_large")
+        == "faiss_gpu_cagra_hnsw_large"
+    )
 
 
 def test_cpu_search_csv_includes_gpu_build_results(tmp_path):
@@ -75,24 +80,19 @@ def test_cpu_search_csv_includes_gpu_build_results(tmp_path):
     assert raw.loc[0, "graph_degree"] == 32
 
 
-def test_cpu_build_plot_uses_gpu_build_results(tmp_path):
-    index_name = "faiss_gpu_cagra_hnsw.graph_degree32"
-    build_results = {
-        ("faiss_gpu_cagra_hnsw", index_name): [
-            ["faiss_gpu_cagra_hnsw", index_name, 20.5]
-        ]
-    }
-    search_results = {
-        "faiss_cpu_hnsw_cagra": [
-            ["faiss_cpu_hnsw_cagra", index_name, 0.95, 1000.0]
-        ]
-    }
+@pytest.mark.parametrize("suffix", ["", "_large"])
+def test_cpu_build_plot_uses_gpu_build_results(tmp_path, suffix):
+    gpu_algo = f"faiss_gpu_cagra_hnsw{suffix}"
+    cpu_algo = f"faiss_cpu_hnsw_cagra{suffix}"
+    index_name = f"{gpu_algo}.graph_degree32"
+    build_results = {(gpu_algo, index_name): [[gpu_algo, index_name, 20.5]]}
+    search_results = {cpu_algo: [[cpu_algo, index_name, 0.95, 1000.0]]}
     fn_out = tmp_path / "build.png"
 
     create_plot_build(
         build_results,
         search_results,
-        {"faiss_cpu_hnsw_cagra": ("C0", "-", 1, "o")},
+        {cpu_algo: ("C0", "-", 1, "o")},
         str(fn_out),
         "test-dataset",
         10,
