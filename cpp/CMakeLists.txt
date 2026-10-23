@@ -1431,9 +1431,51 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_BINARY_DIR}/src/selection/select_k_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
   )
 
+  # Keep every primitive function in its own CUDA translation unit.
+  foreach(
+    primitive IN
+    ITEMS src/core/cub_argmin
+          src/core/cub_merge_sort_keys
+          src/core/cub_select_dispatch
+          src/core/mark_sampled_centroids
+          src/core/thrust_max_element
+          src/core/thrust_scatter
+          src/core/zero_self_diagonal
+  )
+    set(primitive_instantiations)
+    generate_string_matrix(
+      primitive_instantiations
+      MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}_matrix.json"
+      ITEM_FORMAT
+      "template @return_type@ @qualified_function@@template_arguments@(@parameter_types@)@function_qualifiers@@semicolon@"
+      GLUE
+      "\n"
+    )
+    configure_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}.cu.in"
+      "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu" @ONLY
+    )
+    list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
+  endforeach()
+
   add_library(
     cuvs_objs OBJECT
+    ${cuvs_primitive_sources}
+    src/core/copy_distance_tile.cu
+    src/core/cub_device_flagged_if.cu
+    src/core/cub_device_select_if.cu
+    src/core/cub_device_unique.cu
+    src/core/cub_max.cu
     src/core/cub_ptx_query.cu
+    src/core/cub_reduce_second_tile.cu
+    src/core/cub_transform.cu
+    src/core/has_non_finite.cu
+    src/core/mask_distance_tile.cu
+    src/core/thrust_for_each.cu
+    src/core/thrust_reduce_by_key.cu
+    src/core/thrust_stable_sort_by_key.cu
+    src/core/thrust_transform.cu
     src/cluster/detail/minClusterDistanceCompute.cu
     src/cluster/agglomerative.cu
     ${gmm_inst_files}
