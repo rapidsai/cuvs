@@ -37,7 +37,7 @@ For guidance on choosing between them, configuring builds, and tuning GPU resour
 - [CUDA Toolkit 12.2+](https://developer.nvidia.com/cuda-toolkit-archive) and an Ampere architecture GPU or newer, matching the [cuVS requirements](https://docs.nvidia.com/cuvs/installation)
 - JDK 21 or newer. GPU acceleration needs a [JDK 22](https://jdk.java.net/archive/) or newer runtime; on JDK 21
   the accelerated HNSW codecs build graphs on the CPU, and the GPU search codec is unavailable
-- [Maven 3.9.6+](https://maven.apache.org/download.cgi)
+- [Maven 3.10+](https://maven.apache.org/download.cgi)
 - A matching version of the [cuVS libraries](https://docs.nvidia.com/cuvs/installation/java). For Maven usage, install the cuVS libraries and add them to your system library load path.
 
 ### Maven
