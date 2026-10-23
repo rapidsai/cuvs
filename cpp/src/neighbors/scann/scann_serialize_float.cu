@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "scann.cuh"
+#include "detail/scann_serialize.cuh"
 #include <cuvs/neighbors/scann.hpp>
 
 namespace cuvs::neighbors::experimental::scann {
