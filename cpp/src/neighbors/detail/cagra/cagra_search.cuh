@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "../../../core/map_launchers.hpp"
+#include "../../../core/matrix_broadcast_launchers.hpp"
 #include "../../../core/nvtx.hpp"
 #include "factory.cuh"
 #include "sample_filter_utils.cuh"
@@ -315,7 +317,7 @@ void search_main(raft::resources const& res,
     const auto k         = distances.extent(1);
     auto query_norms_ptr = query_norms.data_handle();
 
-    raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
+    cuvs::detail::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
       res,
       raft::make_const_mdspan(distances),
       raft::make_const_mdspan(query_norms.view()),
@@ -545,7 +547,7 @@ void search_multi_partition(
       if (indices[i]->metric() == cuvs::distance::DistanceType::CosineExpanded) {
         auto slice_view = raft::make_device_matrix_view<DistanceT, int64_t, raft::row_major>(
           slice_ptr, chunk_queries, per_partition_topk);
-        raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
+        cuvs::detail::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
           res,
           raft::make_const_mdspan(slice_view),
           raft::make_const_mdspan(chunk_query_norms),
@@ -617,7 +619,7 @@ void search_multi_partition(
     // partition (e.g. MULTI_CTA mp).
     auto partition_ids_slice = raft::make_device_matrix_view<uint32_t, int64_t, raft::row_major>(
       partition_ids.data_handle() + static_cast<size_t>(qid) * topk, chunk_queries, topk);
-    raft::linalg::map(res,
+    cuvs::detail::map(res,
                       partition_ids_slice,
                       raft::div_const_op<uint32_t>{per_partition_topk},
                       raft::make_const_mdspan(positions_view));

@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#include "../../core/map_launchers.hpp"
+#include "../../core/matrix_broadcast_launchers.hpp"
 #include "../../distance/distance.cuh"
 #include "../../distance/top_1_nn.cuh"
 #include <cstdint>
@@ -101,13 +103,6 @@ struct SamplingOp {
 template <typename DataT, typename IndexT>
 using MinClusterAndDistanceResult = cuvs::distance::Top1nnResultView<DataT, IndexT>;
 
-template <typename LabelT, typename IndexT, typename IndicesIterator>
-struct CopyClusterLabelOp {
-  IndicesIterator indices;
-
-  __device__ LabelT operator()(IndexT offset) const { return static_cast<LabelT>(indices[offset]); }
-};
-
 template <bool SquareDistance, typename DataT, typename IndexT, typename DistanceIterator>
 struct WeightedDistanceOp {
   DistanceIterator distances;
@@ -129,7 +124,7 @@ void copyClusterLabels(raft::resources const& handle,
   auto labels_view = raft::make_device_vector_view<LabelT, IndexT>(labels, result.size());
   result.visit_indices([&](auto indices) {
     using IndicesIterator = decltype(indices);
-    raft::linalg::map_offset(
+    cuvs::detail::map_offset(
       handle, labels_view, CopyClusterLabelOp<LabelT, IndexT, IndicesIterator>{indices});
   });
 }
@@ -682,7 +677,7 @@ void finalize_centroids(raft::resources const& handle,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle).get();
 
-  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(handle,
+  cuvs::detail::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(handle,
                                                              raft::make_const_mdspan(centroid_sums),
                                                              weight_per_cluster,
                                                              new_centroids,
@@ -829,7 +824,7 @@ void process_batch(raft::resources const& handle,
   };
   result.visit_indices(update_centroids);
   weightAndComputeClusterCost(handle, result, batch_weights, metric, workspace, batch_cost);
-  raft::linalg::add(clustering_cost.data_handle(),
+  cuvs::detail::add(clustering_cost.data_handle(),
                     clustering_cost.data_handle(),
                     batch_cost.data_handle(),
                     1,
