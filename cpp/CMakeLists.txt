@@ -1450,6 +1450,35 @@ if(NOT BUILD_CPU_ONLY)
     list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
   endforeach()
 
+  # Keep every primitive function in its own CUDA translation unit.
+  foreach(
+    primitive IN
+    ITEMS src/neighbors/detail/cagra/graph_optimization
+          src/neighbors/detail/cagra/graph_log_incoming_edges_histogram
+          src/neighbors/detail/cagra/graph_check_duplicates_and_out_of_range
+          src/neighbors/detail/cagra/graph_merge_graph_gpu
+          src/neighbors/detail/cagra/graph_make_reverse_graph_gpu
+          src/neighbors/detail/cagra/graph_mst_opt_update_graph
+          src/neighbors/detail/cagra/graph_mst_optimization
+          src/neighbors/detail/cagra/graph_prune_graph_gpu
+  )
+    set(primitive_instantiations)
+    generate_string_matrix(
+      primitive_instantiations
+      MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}_matrix.json"
+      ITEM_FORMAT
+      "template @return_type@ @qualified_function@@template_arguments@(@parameter_types@)@function_qualifiers@@semicolon@"
+      GLUE
+      "\n"
+    )
+    configure_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}.cu.in"
+      "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu" @ONLY
+    )
+    list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
+  endforeach()
+
   add_library(
     cuvs_objs OBJECT
     ${cuvs_primitive_sources}

@@ -1,0 +1,277 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+#include <neighbors/detail/cagra/graph_optimization_launchers.hpp>
+
+#include <neighbors/detail/cagra/cagra_helpers.hpp>
+#include <neighbors/detail/cagra/utils.hpp>
+
+#include <core/nvtx.hpp>
+#include <core/omp_wrapper.hpp>
+#include <raft/core/logger.hpp>
+#include <raft/util/cuda_utils.cuh>
+
+#include <algorithm>
+#include <climits>
+#include <iostream>
+#include <memory>
+#include <random>
+#include <type_traits>
+
+#include <neighbors/detail/ann_utils.cuh>
+
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
+#include <raft/linalg/map.cuh>
+
+namespace cg = cooperative_groups;
+
+extern template void raft::linalg::detail::map<false, uint64_t, int, raft::const_op<uint64_t>>(
+  cuda::stream_ref, uint64_t*, int, raft::const_op<uint64_t>);
+
+namespace cuvs::neighbors::cagra::detail::graph {
+
+namespace {
+
+template <class IdxT, uint32_t num_warps, class KnnGraphView, class OutputGraphView>
+__global__ void kern_fused_prune(KnnGraphView knn_graph,        // [graph_chunk_size, graph_degree]
+                                 OutputGraphView output_graph,  // [batch_size, output_graph_degree]
+                                 const uint32_t batch_size,
+                                 const uint32_t batch_id,
+                                 uint32_t* const d_invalid_neighbor_list,
+                                 uint64_t* const stats)
+{
+  // Check assumption we have at least one warp per row of the batch
+  assert(blockDim.x == raft::WarpSize * num_warps);
+  assert(gridDim.x * num_warps >= batch_size);
+
+  extern __shared__ unsigned char smem_buf[];
+
+  cg::thread_block block         = cg::this_thread_block();
+  cg::thread_block_tile<32> warp = cg::tiled_partition<32>(block);
+
+  const uint32_t wid     = threadIdx.x / raft::WarpSize;
+  const uint32_t lane_id = threadIdx.x % raft::WarpSize;
+
+  const uint64_t graph_size          = knn_graph.extent(0);
+  const uint32_t knn_graph_degree    = knn_graph.extent(1);
+  const uint32_t output_graph_degree = output_graph.extent(1);
+
+  IdxT* const smem_indices =
+    reinterpret_cast<IdxT*>(smem_buf + wid * knn_graph_degree * sizeof(IdxT));
+  uint32_t* const smem_num_detour =
+    reinterpret_cast<uint32_t*>(smem_buf + num_warps * knn_graph_degree * sizeof(IdxT) +
+                                wid * knn_graph_degree * sizeof(uint32_t));
+
+#ifndef NDEBUG
+  uint64_t* const num_retain = stats;
+  uint64_t* const num_full   = stats + 1;
+#endif
+
+  const uint32_t maxval16 = 0x0000ffff;
+
+  const uint32_t nid_batch = blockIdx.x * num_warps + wid;
+  const uint64_t nid       = static_cast<uint64_t>(nid_batch) +
+                       (static_cast<uint64_t>(batch_size) * static_cast<uint64_t>(batch_id));
+
+  if (nid >= graph_size) { return; }
+
+  // Load this node's neighbor row into shared memory to reduce global reads
+  for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
+    smem_num_detour[k] = 0;
+    smem_indices[k]    = knn_graph(nid, k);
+    if (smem_indices[k] == nid) {
+      // Lower the priority of self-edge
+      smem_num_detour[k] = knn_graph_degree;
+    }
+  }
+  warp.sync();
+
+  // count number of detours (A->D->B)
+  for (uint32_t kAD = 0; kAD < knn_graph_degree - 1; kAD++) {
+    const uint64_t iD = smem_indices[kAD];
+    if (iD >= graph_size) { continue; }
+    for (uint32_t kDB = lane_id; kDB < knn_graph_degree; kDB += raft::WarpSize) {
+      const uint64_t iB_candidate = knn_graph(iD, kDB);
+      for (uint32_t kAB = kAD + 1; kAB < knn_graph_degree; kAB++) {
+        // if ( kDB < kAB )
+        {
+          const uint64_t iB = smem_indices[kAB];
+          if (iB == iB_candidate) {
+            atomicAdd(smem_num_detour + kAB, 1);
+            break;
+          }
+        }
+      }
+    }
+    warp.sync();
+  }
+
+  uint32_t num_edges_no_detour = 0;
+  for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
+    smem_num_detour[k] = min(smem_num_detour[k], maxval16);
+    if (smem_num_detour[k] == 0) { num_edges_no_detour++; }
+    if (smem_indices[k] >= graph_size) { smem_num_detour[k] = maxval16; }
+  }
+
+  warp.sync();
+
+  num_edges_no_detour = cg::reduce(warp, num_edges_no_detour, cg::plus<uint32_t>());
+  num_edges_no_detour = min(num_edges_no_detour, output_graph_degree);
+
+#ifndef NDEBUG
+  if (lane_id == 0) {
+    atomicAdd((unsigned long long int*)num_retain, (unsigned long long int)num_edges_no_detour);
+    if (num_edges_no_detour >= output_graph_degree) {
+      atomicAdd((unsigned long long int*)num_full, 1);
+    }
+  }
+#endif
+
+  for (uint32_t i = 0; i < output_graph_degree; i++) {
+    uint32_t local_min = maxval16;
+    uint32_t local_idx = maxval16;
+    for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
+      if (smem_num_detour[k] < local_min) {
+        local_min = smem_num_detour[k];
+        local_idx = k;
+      }
+    }
+
+    uint32_t local_min_with_tag = (local_min << 16) | ((uint32_t)local_idx);
+    uint32_t warp_min_with_tag  = cg::reduce(warp, local_min_with_tag, cg::less<uint32_t>());
+    uint32_t warp_min_count     = warp_min_with_tag >> 16;
+    uint32_t warp_local_idx     = warp_min_with_tag & 0xffff;
+
+    if (warp_min_count == maxval16 || warp_local_idx == maxval16) {
+      if (lane_id == 0) { atomicExch(d_invalid_neighbor_list, 1u); }
+      break;
+    }
+
+    IdxT selected_node = smem_indices[warp_local_idx];
+
+    for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
+      if (smem_indices[k] == selected_node) { smem_num_detour[k] = maxval16; }
+    }
+    warp.sync();
+
+    if (lane_id == 0) { output_graph(nid_batch, i) = selected_node; }
+  }
+}
+
+}  // namespace
+
+template <typename IdxT, typename AccessorKnnGraph, typename AccessorOutputGraph>
+void prune_graph_gpu(
+  raft::resources const& res,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorKnnGraph> knn_graph,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorOutputGraph>
+    output_graph)
+{
+  const uint64_t graph_size          = output_graph.extent(0);
+  const uint64_t knn_graph_degree    = knn_graph.extent(1);
+  const uint64_t output_graph_degree = output_graph.extent(1);
+
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+    "cagra::graph::optimize/prune");
+
+  uint32_t batch_size =
+    static_cast<uint32_t>(std::min<uint64_t>(graph_size, helpers::kOptimizeBatchSize));
+  const uint32_t num_batch = raft::div_rounding_up_safe<uint64_t>(graph_size, batch_size);
+
+  RAFT_LOG_DEBUG("# Pruning kNN Graph on GPUs\r");
+
+  const double prune_start = optimization_time();
+
+  [[maybe_unused]] uint64_t num_keep = 0;
+  [[maybe_unused]] uint64_t num_full = 0;
+  auto dev_stats                     = raft::make_device_vector<uint64_t>(res, 2);
+  auto host_stats                    = raft::make_host_vector<uint64_t>(2);
+  raft::matrix::fill(res, dev_stats.view(), uint64_t(0));
+
+  namespace bli                       = cuvs::spatial::knn::detail::utils;
+  auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
+  auto workspace_mr                   = raft::resource::get_workspace_resource_ref(res);
+  auto large_workspace_mr             = raft::resource::get_large_workspace_resource_ref(res);
+
+  // Single-batch read-only iterator for the input graph (graph_size rows fit in one batch).
+  bli::batch_load_iterator<
+    raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorKnnGraph>>
+    d_input_graph(res, knn_graph, graph_size, copy_stream, large_workspace_mr);
+  auto input_view = (*d_input_graph).view();
+
+  bli::batch_load_iterator<
+    raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorOutputGraph>>
+    d_output_graph(res,
+                   output_graph,
+                   batch_size,
+                   copy_stream,
+                   workspace_mr,
+                   enable_prefetch,
+                   /*initialize=*/false,
+                   /*host_writeback=*/true);
+  d_output_graph.prefetch_next_batch();
+
+  auto d_invalid_neighbor_list = raft::make_device_scalar<uint32_t>(res, 0u);
+
+  const uint32_t num_warps = 4;
+  const dim3 threads_prune(raft::WarpSize * num_warps, 1, 1);
+  const dim3 blocks_prune(raft::ceildiv(batch_size, num_warps), 1, 1);
+  const size_t prune_smem_size = num_warps * knn_graph_degree * (sizeof(IdxT) + sizeof(uint32_t));
+
+  for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
+    auto output_view = (*d_output_graph).view();
+    kern_fused_prune<IdxT, num_warps>
+      <<<blocks_prune,
+         threads_prune,
+         prune_smem_size,
+         raft::resource::get_cuda_stream(res).get()>>>(input_view,
+                                                       output_view,
+                                                       batch_size,
+                                                       i_batch,
+                                                       d_invalid_neighbor_list.data_handle(),
+                                                       dev_stats.data_handle());
+
+    d_output_graph.prefetch_next_batch();
+    ++d_output_graph;
+    RAFT_LOG_DEBUG(
+      "# Pruning kNN Graph on GPUs (%.1lf %%)\r",
+      (double)std::min<IdxT>((i_batch + 1) * batch_size, graph_size) / graph_size * 100);
+  }
+  raft::resource::sync_stream(res);
+  RAFT_LOG_DEBUG("\n");
+
+  uint32_t invalid_neighbor_list = 0;
+  raft::copy(
+    res, raft::make_host_scalar_view(&invalid_neighbor_list), d_invalid_neighbor_list.view());
+  raft::copy(res, host_stats.view(), raft::make_const_mdspan(dev_stats.view()));
+  raft::resource::sync_stream(res);
+
+  RAFT_EXPECTS(
+    invalid_neighbor_list == 0,
+    "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
+    "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
+    "overflows occur during the norm computation between the dataset vectors.");
+
+  num_keep = host_stats.data_handle()[0];
+  num_full = host_stats.data_handle()[1];
+
+  const double prune_end = optimization_time();
+  RAFT_LOG_DEBUG(
+    "# Time for pruning on GPU: %.1lf sec, "
+    "avg_no_detour_edges_per_node: %.2lf/%u, "
+    "nodes_with_no_detour_at_all_edges: %.1lf%%",
+    prune_end - prune_start,
+    (double)num_keep / graph_size,
+    output_graph_degree,
+    (double)num_full / graph_size * 100);
+}
+
+}  // namespace cuvs::neighbors::cagra::detail::graph
+
+namespace cuvs::neighbors::cagra::detail::graph {
+
+@primitive_instantiations@
+
+}
