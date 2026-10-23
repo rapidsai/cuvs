@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -20,7 +20,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
-from ..backends._utils import expand_param_grid
+from ..backends._utils import (
+    expand_param_grid,
+    get_index_filename,
+    get_index_name_prefix,
+)
 
 
 @dataclass
@@ -839,11 +843,16 @@ class CppGBenchConfigLoader(ConfigLoader):
             A list of index configurations.
         """
         indexes = []
+        name_prefix = get_index_name_prefix(algo)
 
         for build_param in all_build_params:
             index = {"algo": algo, "build_param": build_param}
 
-            index_name = f"{algo}_{group}" if group != "base" else f"{algo}"
+            index_name = (
+                f"{name_prefix}_{group}"
+                if group != "base"
+                else f"{name_prefix}"
+            )
             for name, val in build_param.items():
                 index_name += f".{name}{val}"
 
@@ -861,12 +870,9 @@ class CppGBenchConfigLoader(ConfigLoader):
                 ):
                     continue
 
-            index_filename = (
-                index_name if len(index_name) < 128 else str(hash(index_name))
-            )
             index["name"] = index_name
             index["file"] = os.path.join(
-                dataset_path, dataset, "index", index_filename
+                dataset_path, dataset, "index", get_index_filename(index_name)
             )
 
             # Validate and filter search params (skipped in tune mode

@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 
 namespace {
 
@@ -71,7 +72,7 @@ class faiss_cpu : public algo<T> {
     static_assert(std::is_same_v<T, float>, "faiss support only float type");
   }
 
-  void build(const T* dataset, size_t nrow) final;
+  void build(const T* dataset, size_t nrow) override;
 
   void set_search_param(const search_param_base& param, const void* filter_bitset) override;
 
@@ -185,7 +186,14 @@ template <typename T>
 template <typename Index>
 void faiss_cpu<T>::load_(const std::string& file)
 {
-  index_ = std::shared_ptr<Index>(dynamic_cast<Index*>(faiss::read_index(file.c_str())));
+  std::unique_ptr<faiss::Index> loaded{faiss::read_index(file.c_str())};
+  auto* typed = dynamic_cast<Index*>(loaded.get());
+  if (typed == nullptr) {
+    throw std::runtime_error("'" + file + "' does not contain a " + typeid(Index).name() +
+                             " (found " + typeid(*loaded).name() + ")");
+  }
+  loaded.release();
+  index_.reset(typed);
 }
 
 template <typename T>
@@ -267,8 +275,6 @@ class faiss_cpu_ivfrabitq : public faiss_cpu<T> {
   }
 };
 
-// TODO(snanditale): Enable this in cmake
-//  ref: https://github.com/NVIDIA/raft/issues/1876
 template <typename T>
 class faiss_cpu_ivfsq : public faiss_cpu<T> {
  public:
@@ -373,6 +379,69 @@ class faiss_cpu_hnsw_flat : public faiss_cpu<T> {
   std::unique_ptr<algo<T>> copy()
   {
     return std::make_unique<faiss_cpu_hnsw_flat<T>>(*this);  // use copy constructor
+  }
+
+  void search(const T* queries,
+              int batch_size,
+              int k,
+              algo_base::index_type* neighbors,
+              float* distances) const override
+  {
+    static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
+                  "sizes of size_t and faiss::idx_t are different");
+
+    this->index_->search(batch_size,
+                         queries,
+                         k,
+                         distances,
+                         reinterpret_cast<faiss::idx_t*>(neighbors),
+                         search_params_.get());
+  }
+
+ private:
+  std::shared_ptr<faiss::SearchParameters> search_params_;
+};
+
+/**
+ * Search-only wrapper for a faiss::IndexHNSWCagra exported by `faiss_gpu_cagra_hnsw`.
+ *
+ * The index is built and converted on a GPU host; this wrapper only loads and searches it, so it
+ * can run in a CPU-only build.
+ */
+template <typename T>
+class faiss_cpu_hnsw_cagra : public faiss_cpu<T> {
+ public:
+  struct search_param : public faiss_cpu<T>::search_param {
+    faiss::SearchParametersHNSW p;
+  };
+  faiss_cpu_hnsw_cagra(Metric metric, int dim)
+    : faiss_cpu<T>(metric, dim, typename faiss_cpu<T>::build_param{})
+  {
+  }
+
+  void build(const T*, size_t) override
+  {
+    throw std::runtime_error(
+      "faiss_cpu_hnsw_cagra does not build indexes; build them with faiss_gpu_cagra_hnsw");
+  }
+
+  void set_search_param(const typename algo<T>::search_param& param,
+                        const void* filter_bitset) override
+  {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
+    auto sp = static_cast<const typename faiss_cpu_hnsw_cagra<T>::search_param&>(param);
+    this->search_params_ = std::make_shared<faiss::SearchParametersHNSW>(sp.p);
+  }
+
+  void save(const std::string& file) const override
+  {
+    this->template save_<faiss::IndexHNSWCagra>(file);
+  }
+  void load(const std::string& file) override { this->template load_<faiss::IndexHNSWCagra>(file); }
+
+  std::unique_ptr<algo<T>> copy() override
+  {
+    return std::make_unique<faiss_cpu_hnsw_cagra<T>>(*this);  // use copy constructor
   }
 
   void search(const T* queries,

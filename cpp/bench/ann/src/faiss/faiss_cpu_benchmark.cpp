@@ -1,18 +1,16 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../common/ann_types.hpp"
 #include "faiss_cpu_wrapper.h"
 
-#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-#include <utility>
 
 namespace cuvs::bench {
 
@@ -98,6 +96,13 @@ void parse_search_param(const nlohmann::json& conf,
   param.p = p;
 }
 
+template <typename T>
+void parse_search_param(const nlohmann::json& conf,
+                        typename cuvs::bench::faiss_cpu_hnsw_cagra<T>::search_param& param)
+{
+  if (conf.contains("efSearch")) { param.p.efSearch = conf.at("efSearch"); }
+}
+
 template <typename T, template <typename> class Algo>
 auto make_algo(cuvs::bench::Metric metric, int dim, const nlohmann::json& conf)
   -> std::unique_ptr<cuvs::bench::algo<T>>
@@ -129,6 +134,8 @@ auto create_algo(const std::string& algo_name,
       a = std::make_unique<cuvs::bench::faiss_cpu_flat<T>>(metric, dim);
     } else if (algo_name == "faiss_cpu_hnsw_flat") {
       a = make_algo<T, cuvs::bench::faiss_cpu_hnsw_flat>(metric, dim, conf);
+    } else if (algo_name == "faiss_cpu_hnsw_cagra") {
+      a = std::make_unique<cuvs::bench::faiss_cpu_hnsw_cagra<T>>(metric, dim);
     }
   }
 
@@ -153,6 +160,10 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
     return param;
   } else if (algo_name == "faiss_cpu_hnsw_flat") {
     auto param = std::make_unique<typename cuvs::bench::faiss_cpu_hnsw_flat<T>::search_param>();
+    parse_search_param<T>(conf, *param);
+    return param;
+  } else if (algo_name == "faiss_cpu_hnsw_cagra") {
+    auto param = std::make_unique<typename cuvs::bench::faiss_cpu_hnsw_cagra<T>::search_param>();
     parse_search_param<T>(conf, *param);
     return param;
   }
