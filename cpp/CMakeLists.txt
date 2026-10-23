@@ -1499,11 +1499,42 @@ if(NOT BUILD_CPU_ONLY)
     list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
   endforeach()
 
+  # Keep every primitive function in its own CUDA translation unit.
+  foreach(
+    primitive IN
+    ITEMS src/core/compute_duplicates_mask
+          src/core/compute_graph_laplacian
+          src/core/coo_degree
+          src/core/coo_remove_scalar
+          src/core/coo_sort
+          src/core/laplacian_normalized
+          src/core/masked_matmul
+          src/core/symmetrize
+          src/core/symmetrize_connectivity_graph
+  )
+    set(primitive_instantiations)
+    generate_string_matrix(
+      primitive_instantiations
+      MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}_matrix.json"
+      ITEM_FORMAT
+      "template @return_type@ @qualified_function@@template_arguments@(@parameter_types@)@function_qualifiers@@semicolon@"
+      GLUE
+      "\n"
+    )
+    configure_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/${primitive}.cu.in"
+      "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu" @ONLY
+    )
+    list(APPEND cuvs_primitive_sources "${CMAKE_CURRENT_BINARY_DIR}/${primitive}.cu")
+  endforeach()
+
   add_library(
     cuvs_objs OBJECT
     ${cuvs_primitive_sources}
     src/core/addScalar.cu
     src/core/calc_nnz_by_rows.cu
+    src/core/coo_symmetrize.cu
     src/core/copy_distance_tile.cu
     src/core/cub_device_flagged_if.cu
     src/core/cub_device_select_if.cu
