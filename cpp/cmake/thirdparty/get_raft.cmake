@@ -37,6 +37,12 @@ function(find_and_configure_raft)
         string(APPEND RAFT_COMPONENTS " distributed")
     endif()
 
+    set(raft_patch_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../patches")
+    include("${rapids-cmake-dir}/cpm/package_override.cmake")
+    rapids_cpm_package_override("${raft_patch_dir}/raft_override.json")
+    include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
+    rapids_cpm_generate_patch_command(raft ${PKG_VERSION} raft_patch_command raft_build_patch_only)
+
     #-----------------------------------------------------
     # Invoke CPM find_package()
     #-----------------------------------------------------
@@ -46,6 +52,7 @@ function(find_and_configure_raft)
             INSTALL_EXPORT_SET  cuvs-exports
             COMPONENTS          ${RAFT_COMPONENTS}
             CPM_ARGS
+              ${raft_patch_command}
               EXCLUDE_FROM_ALL TRUE
               GIT_REPOSITORY        https://github.com/${PKG_FORK}/raft.git
               GIT_TAG               ${PKG_PINNED_TAG}
@@ -56,6 +63,26 @@ function(find_and_configure_raft)
               "RAFT_NVTX ${PKG_ENABLE_NVTX}"
               "RAFT_COMPILE_LIBRARY OFF"
             )
+
+    include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
+    rapids_cpm_display_patch_status(raft)
+
+    # A local source override bypasses CPM's patch step. Accept it only when the
+    # required changes are already present, without modifying the supplied tree.
+    if(NOT raft_SOURCE_DIR)
+        message(FATAL_ERROR "cuVS requires RAFT sources with the bundled header fixes; an installed RAFT target cannot replace them.")
+    endif()
+    cmake_path(GET raft_SOURCE_DIR PARENT_PATH raft_source_parent)
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env "GIT_CEILING_DIRECTORIES=${raft_source_parent}"
+                "${GIT_EXECUTABLE}" apply --reverse --check "${raft_patch_dir}/raft-rng-headers.diff"
+        WORKING_DIRECTORY "${raft_SOURCE_DIR}"
+        RESULT_VARIABLE raft_patch_missing
+        OUTPUT_QUIET ERROR_QUIET
+    )
+    if(NOT raft_patch_missing EQUAL 0)
+        message(FATAL_ERROR "RAFT is missing raft-rng-headers.diff. Unset CPM_raft_SOURCE to fetch a patched build-local copy, or provide an already-patched source tree. The supplied source was not modified.")
+    endif()
 endfunction()
 
 # RAFT target is shipped together with the RAFT_LOG_ACTIVE_LEVEL macro. Simply redefining the macro
