@@ -1433,6 +1433,7 @@ if(NOT BUILD_CPU_ONLY)
 
   add_library(
     cuvs_objs OBJECT
+    src/core/cuda_primitives.cu
     src/cluster/detail/minClusterDistanceCompute.cu
     src/cluster/agglomerative.cu
     ${gmm_inst_files}
@@ -1460,8 +1461,6 @@ if(NOT BUILD_CPU_ONLY)
     src/cluster/kmeans_transform_float.cu
     src/cluster/single_linkage_float.cu
     src/cluster/spectral.cu
-    src/core/bitset.cu
-    src/core/bloom_filter.cu
     src/core/roaring_allowlist.cu
     src/neighbors/roaring_bitmap_filter.cu
     src/core/omp_wrapper.cpp
