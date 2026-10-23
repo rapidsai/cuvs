@@ -5,7 +5,20 @@
 #pragma once
 
 #include "../../../core/map_launchers.hpp"
+
+#include "../../../core/gather_launchers.hpp"
+
+#include "../../../core/cub_runtime_launchers.hpp"
+#include "../../../core/radix_sorting_launchers.hpp"
+
+#include "../../../core/prefix_scans_launchers.hpp"
 #include "../../../core/reduction_launchers.hpp"
+
+#include "../../../core/coo_sort_launchers.hpp"
+#include "../../../core/spectral_launchers.hpp"
+#include "../../../core/unique_labels_launchers.hpp"
+
+#include "../../../core/thrust_indexed_copy_launchers.hpp"
 #include "../../../distance/masked_nn.cuh"
 #include <cuvs/distance/distance.hpp>
 
@@ -165,11 +178,11 @@ struct MutualReachabilityFixConnectivitiesRedOp {
   void gather(const raft::resources& handle, value_idx* map)
   {
     auto tmp_core_dists = raft::make_device_vector<value_t>(handle, m);
-    thrust::gather(raft::resource::get_thrust_policy(handle),
-                   map,
-                   map + m,
-                   core_dists,
-                   tmp_core_dists.data_handle());
+    cuvs::detail::thrust_gather(raft::resource::get_thrust_policy(handle),
+                                map,
+                                map + m,
+                                core_dists,
+                                tmp_core_dists.data_handle());
     raft::copy_async(
       core_dists, tmp_core_dists.data_handle(), m, raft::resource::get_cuda_stream(handle));
   }
@@ -177,11 +190,11 @@ struct MutualReachabilityFixConnectivitiesRedOp {
   void scatter(const raft::resources& handle, value_idx* map)
   {
     auto tmp_core_dists = raft::make_device_vector<value_t>(handle, m);
-    thrust::scatter(raft::resource::get_thrust_policy(handle),
-                    core_dists,
-                    core_dists + m,
-                    map,
-                    tmp_core_dists.data_handle());
+    cuvs::detail::thrust_scatter(raft::resource::get_thrust_policy(handle),
+                                 core_dists,
+                                 core_dists + m,
+                                 map,
+                                 tmp_core_dists.data_handle());
     raft::copy_async(
       core_dists, tmp_core_dists.data_handle(), m, raft::resource::get_cuda_stream(handle));
   }
@@ -243,7 +256,7 @@ template <typename value_idx>
 value_idx get_n_components(value_idx* colors, size_t n_rows, cudaStream_t stream)
 {
   rmm::device_uvector<value_idx> map_ids(0, stream);
-  int num_clusters = raft::label::getUniquelabels(map_ids, colors, n_rows, stream);
+  int num_clusters = cuvs::detail::getUniquelabels(map_ids, colors, n_rows, stream);
   return num_clusters;
 }
 
@@ -301,7 +314,7 @@ void perform_1nn(raft::resources const& handle,
   auto sort_plan = raft::make_device_vector<value_idx>(handle, (value_idx)n_rows);
   raft::linalg::map_offset(handle, sort_plan.view(), [] __device__(value_idx idx) { return idx; });
 
-  thrust::sort_by_key(
+  cuvs::detail::thrust_sort_by_key(
     raft::resource::get_thrust_policy(handle), colors, colors + n_rows, sort_plan.data_handle());
 
   // Modify the reduction operation based on the sort plan.
@@ -311,7 +324,7 @@ void perform_1nn(raft::resources const& handle,
     raft::make_device_matrix_view<value_t, value_idx>(const_cast<value_t*>(X), n_rows, n_cols);
   auto sort_plan_const_view =
     raft::make_device_vector_view<const value_idx, value_idx>(sort_plan.data_handle(), n_rows);
-  raft::matrix::gather(handle, X_mutable_view, sort_plan_const_view, (value_idx)col_batch_size);
+  cuvs::detail::gather(handle, X_mutable_view, sort_plan_const_view, (value_idx)col_batch_size);
 
   // Get the number of unique components from the array of colors
   value_idx n_components = get_n_components(colors, n_rows, stream.get());
@@ -407,8 +420,9 @@ void perform_1nn(raft::resources const& handle,
   auto tmp_colors = raft::make_device_vector<value_idx>(handle, n_rows);
   auto tmp_kvp    = raft::make_device_vector<OutT>(handle, n_rows);
 
-  thrust::scatter(exec_policy, kvp, kvp + n_rows, sort_plan.data_handle(), tmp_kvp.data_handle());
-  thrust::scatter(
+  cuvs::detail::thrust_scatter(
+    exec_policy, kvp, kvp + n_rows, sort_plan.data_handle(), tmp_kvp.data_handle());
+  cuvs::detail::thrust_scatter(
     exec_policy, colors, colors + n_rows, sort_plan.data_handle(), tmp_colors.data_handle());
   reduction_op.scatter(handle, sort_plan.data_handle());
 
@@ -446,13 +460,13 @@ void sort_by_color(raft::resources const& handle,
 {
   auto exec_policy   = raft::resource::get_thrust_policy(handle);
   auto arg_sort_iter = cuda::make_counting_iterator<value_idx>(0);
-  thrust::copy(exec_policy, arg_sort_iter, arg_sort_iter + n_rows, src_indices);
+  cuvs::detail::thrust_copy(exec_policy, arg_sort_iter, arg_sort_iter + n_rows, src_indices);
 
   auto keys = thrust::make_zip_iterator(
     cuda::std::make_tuple(colors, nn_colors, (raft::KeyValuePair<value_idx, value_t>*)kvp));
   auto vals = thrust::make_zip_iterator(cuda::std::make_tuple(src_indices));
   // get all the colors in contiguous locations so we can map them to warps.
-  thrust::sort_by_key(exec_policy, keys, keys + n_rows, vals, TupleComp());
+  cuvs::detail::thrust_sort_by_key(exec_policy, keys, keys + n_rows, vals, TupleComp());
 }
 
 template <typename value_idx, typename value_t>
@@ -563,7 +577,7 @@ void cross_component_nn(
 
   // Normalize colors so they are drawn from a monotonically increasing set
   constexpr bool zero_based = true;
-  raft::label::make_monotonic(
+  cuvs::detail::make_monotonic(
     colors.data(), const_cast<value_idx*>(orig_colors), n_rows, stream.get(), zero_based);
 
   /**
@@ -598,13 +612,13 @@ void cross_component_nn(
    */
   // Compute mask of duplicates
   rmm::device_uvector<value_idx> out_index(n_rows + 1, stream);
-  raft::sparse::op::compute_duplicates_mask(
+  cuvs::detail::compute_duplicates_mask(
     out_index.data(), colors.data(), nn_colors.data(), n_rows, stream.get());
 
-  thrust::exclusive_scan(raft::resource::get_thrust_policy(handle),
-                         out_index.data(),
-                         out_index.data() + out_index.size(),
-                         out_index.data());
+  cuvs::detail::thrust_exclusive_scan(raft::resource::get_thrust_policy(handle),
+                                      out_index.data(),
+                                      out_index.data() + out_index.size(),
+                                      out_index.data());
 
   // compute final size
   value_idx size_int = 0;
@@ -625,7 +639,7 @@ void cross_component_nn(
   /**
    * Symmetrize resulting edge list
    */
-  raft::sparse::linalg::symmetrize(
+  cuvs::detail::symmetrize(
     handle, min_edges.rows(), min_edges.cols(), min_edges.vals(), n_rows, n_rows, size, out);
 }
 

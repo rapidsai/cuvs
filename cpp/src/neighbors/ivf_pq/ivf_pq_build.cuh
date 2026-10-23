@@ -6,8 +6,13 @@
 #pragma once
 
 #include "../../core/map_launchers.hpp"
+
+#include "../../core/gather_launchers.hpp"
+
+#include "../../core/cub_runtime_launchers.hpp"
 #include "../../core/matrix_broadcast_launchers.hpp"
 #include "../../core/nvtx.hpp"
+#include "../../core/prefix_scans_launchers.hpp"
 #include "../../core/reduction_launchers.hpp"
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
@@ -104,7 +109,7 @@ void select_residuals(raft::resources const& handle,
   // need to know it, any strictly positive number would work.
   thrust::transform_iterator<utils::mapping<float>, const T*, thrust::use_default, float>
     mapping_itr(dataset, utils::mapping<float>{});
-  raft::matrix::gather(mapping_itr, (IdxT)dim, n_rows, row_ids, n_rows, tmp.data(), stream.get());
+  cuvs::detail::gather(mapping_itr, (IdxT)dim, n_rows, row_ids, n_rows, tmp.data(), stream.get());
 
   cuvs::detail::linewise_op<raft::Apply::ALONG_ROWS>(
     handle,
@@ -244,11 +249,11 @@ auto calculate_offsets_and_indices(IdxT n_rows,
   // Calculate the offsets
   IdxT cumsum = 0;
   raft::update_device(cluster_offsets, &cumsum, 1, stream);
-  thrust::inclusive_scan(
+  cuvs::detail::thrust_inclusive_scan(
     exec_policy, cluster_sizes, cluster_sizes + n_lists, cluster_offsets + 1, thrust::plus<>{});
   raft::update_host(&cumsum, cluster_offsets + n_lists, 1, stream);
   uint32_t max_cluster_size =
-    *thrust::max_element(exec_policy, cluster_sizes, cluster_sizes + n_lists);
+    *cuvs::detail::thrust_max_element(exec_policy, cluster_sizes, cluster_sizes + n_lists);
   stream.sync();
   RAFT_EXPECTS(cumsum == n_rows, "cluster sizes do not add up.");
   RAFT_LOG_DEBUG("Max cluster size %d", max_cluster_size);

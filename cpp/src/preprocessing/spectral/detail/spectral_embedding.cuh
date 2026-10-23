@@ -5,6 +5,11 @@
 
 #pragma once
 
+#include "../../../core/gather_launchers.hpp"
+#include "../../../core/thrust_fill_launchers.hpp"
+
+#include "../../../core/coo_sort_launchers.hpp"
+#include "../../../core/spectral_launchers.hpp"
 #include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/preprocessing/spectral_embedding.hpp>
 
@@ -34,10 +39,9 @@ OutSparseMatrixType create_laplacian(raft::resources const& handle,
                                      InSparseMatrixViewType sparse_matrix_view,
                                      raft::device_vector_view<DataT, int> diagonal)
 {
-  auto laplacian =
-    spectral_embedding_config.norm_laplacian
-      ? raft::sparse::linalg::laplacian_normalized(handle, sparse_matrix_view, diagonal)
-      : raft::sparse::linalg::compute_graph_laplacian(handle, sparse_matrix_view);
+  auto laplacian = spectral_embedding_config.norm_laplacian
+                     ? cuvs::detail::laplacian_normalized(handle, sparse_matrix_view, diagonal)
+                     : cuvs::detail::compute_graph_laplacian(handle, sparse_matrix_view);
 
   auto laplacian_elements_view = raft::make_device_vector_view<DataT>(
     laplacian.get_elements().data(), laplacian.structure_view().get_nnz());
@@ -107,7 +111,7 @@ void compute_eigenpairs(raft::resources const& handle,
     embedding.extent(1),  // Swap dimensions for the view
     embedding.extent(0));
 
-  raft::matrix::gather<DataT, int, int>(
+  cuvs::detail::gather<DataT, int, int>(
     handle,
     raft::make_const_mdspan(eigenvectors_row_view),  // Source matrix (as row-major view)
     raft::make_const_mdspan(col_indices.view()),     // Column indices to gather
@@ -172,7 +176,7 @@ void create_connectivity_graph(
   });
 
   // set all distances to 1.0f (connectivity KNN graph)
-  raft::matrix::fill(
+  cuvs::detail::matrix_fill(
     handle, raft::make_device_vector_view<float, NNZType>(d_distances.data_handle(), nnz), 1.0f);
 
   auto coo_matrix_view = raft::make_device_coo_matrix_view<const float, int, int, NNZType>(
@@ -182,21 +186,17 @@ void create_connectivity_graph(
 
   auto sym_coo1_matrix =
     raft::make_device_coo_matrix<float, int, int, NNZType>(handle, n_samples, n_samples);
-  raft::sparse::linalg::coo_symmetrize<128, float, int, NNZType>(
-    handle, coo_matrix_view, sym_coo1_matrix, [] __device__(int row, int col, float a, float b) {
-      return 0.5f * (a + b);
-    });
+  cuvs::detail::symmetrize_connectivity_graph(handle, coo_matrix_view, sym_coo1_matrix);
 
-  raft::sparse::op::coo_sort<float, int, NNZType>(
-    n_samples,
-    n_samples,
-    sym_coo1_matrix.structure_view().get_nnz(),
-    sym_coo1_matrix.structure_view().get_rows().data(),
-    sym_coo1_matrix.structure_view().get_cols().data(),
-    sym_coo1_matrix.get_elements().data(),
-    stream.get());
+  cuvs::detail::coo_sort<float, int, NNZType>(n_samples,
+                                              n_samples,
+                                              sym_coo1_matrix.structure_view().get_nnz(),
+                                              sym_coo1_matrix.structure_view().get_rows().data(),
+                                              sym_coo1_matrix.structure_view().get_cols().data(),
+                                              sym_coo1_matrix.get_elements().data(),
+                                              stream.get());
 
-  raft::sparse::op::coo_remove_scalar<128, float, int, NNZType>(
+  cuvs::detail::coo_remove_scalar<128, float, int, NNZType>(
     handle,
     raft::make_device_coo_matrix_view<const float, int, int, NNZType>(
       sym_coo1_matrix.get_elements().data(), sym_coo1_matrix.structure_view()),

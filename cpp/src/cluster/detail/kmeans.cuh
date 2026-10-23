@@ -5,9 +5,14 @@
 #pragma once
 
 #include "../../core/map_launchers.hpp"
+
+#include "../../core/gather_launchers.hpp"
+
+#include "../../core/cub_runtime_launchers.hpp"
 #include "../../core/matrix_broadcast_launchers.hpp"
 #include "../../core/nvtx.hpp"
 #include "../../core/reduction_launchers.hpp"
+#include "../../core/thrust_fill_launchers.hpp"
 #include "../../neighbors/detail/ann_utils.cuh"
 #include "kmeans_batch_loader.cuh"
 #include "kmeans_common.cuh"
@@ -264,7 +269,7 @@ void kmeansPlusPlus(raft::resources const& handle,
     // distance to the nearest existing cluster
 
     raft::random::discrete(handle, rng, indices_view, const_weights_view);
-    raft::matrix::gather(handle, const_X_view, const_indices_view, candidates_view);
+    cuvs::detail::gather(handle, const_X_view, const_indices_view, candidates_view);
 
     // Calculate pairwise distance between X and the centroid candidates
     // Output - pwd [n_trials x n_samples]
@@ -299,23 +304,23 @@ void kmeansPlusPlus(raft::resources const& handle,
     {
       // Determine temporary device storage requirements
       size_t temp_storage_bytes = 0;
-      cub::DeviceReduce::ArgMin(nullptr,
-                                temp_storage_bytes,
-                                costPerCandidate.data_handle(),
-                                minClusterIndexAndDistance.data(),
-                                costPerCandidate.extent(0),
-                                stream);
+      cuvs::detail::cub_argmin(nullptr,
+                               temp_storage_bytes,
+                               costPerCandidate.data_handle(),
+                               minClusterIndexAndDistance.data(),
+                               costPerCandidate.extent(0),
+                               stream);
 
       // Allocate temporary storage
       workspace.resize(temp_storage_bytes, stream);
 
       // Run argmin-reduction
-      cub::DeviceReduce::ArgMin(workspace.data(),
-                                temp_storage_bytes,
-                                costPerCandidate.data_handle(),
-                                minClusterIndexAndDistance.data(),
-                                costPerCandidate.extent(0),
-                                stream);
+      cuvs::detail::cub_argmin(workspace.data(),
+                               temp_storage_bytes,
+                               costPerCandidate.data_handle(),
+                               minClusterIndexAndDistance.data(),
+                               costPerCandidate.extent(0),
+                               stream);
 
       int bestCandidateIdx = -1;
       raft::copy(handle,
@@ -845,10 +850,10 @@ void kmeans_fit(
       weight_batches.emplace(
         handle, weight_view, device_buffer_samples, batch_copy_stream, batch_mr, enable_prefetch);
     } else {
-      raft::matrix::fill(handle, batch_weights_buf.view(), DataT{1});
+      cuvs::detail::matrix_fill(handle, batch_weights_buf.view(), DataT{1});
     }
   } else if (weight_ptr == nullptr) {
-    raft::matrix::fill(handle, batch_weights_buf.view(), DataT{1});
+    cuvs::detail::matrix_fill(handle, batch_weights_buf.view(), DataT{1});
   }
 
   std::optional<raft::device_vector<DataT, IndexT>> prenormalized_weights;
@@ -994,9 +999,9 @@ void kmeans_fit(
 
       RAFT_LOG_DEBUG("KMeans.fit: Iteration-%d", n_current_iter);
 
-      raft::matrix::fill(handle, centroid_sums.view(), DataT{0});
-      raft::matrix::fill(handle, weight_per_cluster.view(), DataT{0});
-      raft::matrix::fill(handle, clustering_cost.view(), DataT{0});
+      cuvs::detail::matrix_fill(handle, centroid_sums.view(), DataT{0});
+      cuvs::detail::matrix_fill(handle, weight_per_cluster.view(), DataT{0});
+      cuvs::detail::matrix_fill(handle, clustering_cost.view(), DataT{0});
 
       // Complete iteration setup before starting the cold pipeline, so no potentially blocking
       // CUDA setup remains between the first transfer and its first consumer.
@@ -1116,7 +1121,7 @@ void kmeans_fit(
         cur_centroids_ptr, n_clusters, n_features);
 
       iter_inertia = DataT{0};
-      raft::matrix::fill(handle, clustering_cost.view(), DataT{0});
+      cuvs::detail::matrix_fill(handle, clustering_cost.view(), DataT{0});
       data_batches.start();
       if (weight_batches.has_value()) { weight_batches->start(); }
       for (std::size_t batch_pos = 0; batch_pos < data_batches.num_batches(); ++batch_pos) {
@@ -1269,7 +1274,7 @@ void kmeans_predict(raft::resources const& handle,
   if (sample_weight.has_value())
     raft::copy(handle, weight.view(), sample_weight.value());
   else
-    raft::matrix::fill(handle, weight.view(), DataT(1));
+    cuvs::detail::matrix_fill(handle, weight.view(), DataT(1));
 
   if (normalize_weight && sample_weight.has_value()) {
     auto d_wt_sum = raft::make_device_scalar<DataT>(handle, DataT{0});

@@ -8,6 +8,9 @@
 //
 
 #include "../../../core/omp_wrapper.hpp"
+#include "../../../core/radix_sorting_launchers.hpp"
+
+#include "../../../core/prefix_scans_launchers.hpp"
 #include "../../../core/reduction_launchers.hpp"
 #include "../../../util/serialize_validation.hpp"
 #include "../../detail/ann_utils.cuh"
@@ -458,21 +461,21 @@ void IVFGPU::construct_on_gpu(const float* device_data,
   rmm::device_uvector<size_t> d_offsets(num_centroids + 1, stream_);
 
   temp_storage_bytes = 0;
-  RAFT_CUDA_TRY(cub::DeviceScan::ExclusiveSum(nullptr,
-                                              temp_storage_bytes,
-                                              d_histogram.data(),
-                                              d_offsets.data(),
-                                              num_centroids,
-                                              stream_.get()));
-
-  {
-    rmm::device_buffer d_temp_storage(temp_storage_bytes, stream_);
-    RAFT_CUDA_TRY(cub::DeviceScan::ExclusiveSum(d_temp_storage.data(),
+  RAFT_CUDA_TRY(cuvs::detail::cub_exclusive_sum(nullptr,
                                                 temp_storage_bytes,
                                                 d_histogram.data(),
                                                 d_offsets.data(),
                                                 num_centroids,
                                                 stream_.get()));
+
+  {
+    rmm::device_buffer d_temp_storage(temp_storage_bytes, stream_);
+    RAFT_CUDA_TRY(cuvs::detail::cub_exclusive_sum(d_temp_storage.data(),
+                                                  temp_storage_bytes,
+                                                  d_histogram.data(),
+                                                  d_offsets.data(),
+                                                  num_centroids,
+                                                  stream_.get()));
   }
 
   // Set the last offset element
@@ -616,22 +619,22 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
 
   d_temp_storage     = nullptr;
   temp_storage_bytes = 0;
-  RAFT_CUDA_TRY(cub::DeviceScan::ExclusiveSum(d_temp_storage,
-                                              temp_storage_bytes,
-                                              d_histogram.data_handle(),
-                                              d_offsets.data_handle(),
-                                              num_centroids,
-                                              stream_.get()));
+  RAFT_CUDA_TRY(cuvs::detail::cub_exclusive_sum(d_temp_storage,
+                                                temp_storage_bytes,
+                                                d_histogram.data_handle(),
+                                                d_offsets.data_handle(),
+                                                num_centroids,
+                                                stream_.get()));
 
   d_temp_storage_vec = raft::make_device_vector<uint8_t, int64_t>(handle_, temp_storage_bytes);
   d_temp_storage     = d_temp_storage_vec.data_handle();
 
-  RAFT_CUDA_TRY(cub::DeviceScan::ExclusiveSum(d_temp_storage,
-                                              temp_storage_bytes,
-                                              d_histogram.data_handle(),
-                                              d_offsets.data_handle(),
-                                              num_centroids,
-                                              stream_.get()));
+  RAFT_CUDA_TRY(cuvs::detail::cub_exclusive_sum(d_temp_storage,
+                                                temp_storage_bytes,
+                                                d_histogram.data_handle(),
+                                                d_offsets.data_handle(),
+                                                num_centroids,
+                                                stream_.get()));
 
   // Set the last offset element
   raft::copy(d_offsets.data_handle() + num_centroids, &num_vectors, 1, stream_);
@@ -873,30 +876,30 @@ void sort_cluster_query_pairs(raft::resources const& handle,
   // ---- sort by cluster id
   size_t temp_storage_bytes = 0;
 
-  RAFT_CUDA_TRY(cub::DeviceRadixSort::SortPairs(nullptr,
-                                                temp_storage_bytes,
-                                                d_cluster_keys.data_handle(),
-                                                d_sorted_clusters.data_handle(),
-                                                d_query_values.data_handle(),
-                                                d_sorted_queries.data_handle(),
-                                                total_pairs,
-                                                0,
-                                                sizeof(int) * 8,
-                                                stream));
+  RAFT_CUDA_TRY(cuvs::detail::cub_sort_pairs(nullptr,
+                                             temp_storage_bytes,
+                                             d_cluster_keys.data_handle(),
+                                             d_sorted_clusters.data_handle(),
+                                             d_query_values.data_handle(),
+                                             d_sorted_queries.data_handle(),
+                                             total_pairs,
+                                             0,
+                                             sizeof(int) * 8,
+                                             stream));
 
   rmm::device_buffer d_temp_storage(temp_storage_bytes, stream);
 
   // Perform radix sort
-  RAFT_CUDA_TRY(cub::DeviceRadixSort::SortPairs(d_temp_storage.data(),
-                                                temp_storage_bytes,
-                                                d_cluster_keys.data_handle(),
-                                                d_sorted_clusters.data_handle(),
-                                                d_query_values.data_handle(),
-                                                d_sorted_queries.data_handle(),
-                                                total_pairs,
-                                                0,
-                                                sizeof(int) * 8,
-                                                stream));
+  RAFT_CUDA_TRY(cuvs::detail::cub_sort_pairs(d_temp_storage.data(),
+                                             temp_storage_bytes,
+                                             d_cluster_keys.data_handle(),
+                                             d_sorted_clusters.data_handle(),
+                                             d_query_values.data_handle(),
+                                             d_sorted_queries.data_handle(),
+                                             total_pairs,
+                                             0,
+                                             sizeof(int) * 8,
+                                             stream));
 
   // Combine sorted results into pairs
   combine_to_pairs<<<num_blocks, threads_per_block, 0, stream>>>(

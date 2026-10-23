@@ -6,6 +6,7 @@
 #pragma once
 
 #include "../../../core/reduction_launchers.hpp"
+#include "../../../core/thrust_fill_launchers.hpp"
 #include "../silhouette_score.cuh"
 
 #include <raft/core/device_mdspan.hpp>
@@ -202,7 +203,7 @@ value_t silhouette_score(
     a_ptr = scores;
   }
 
-  raft::matrix::fill(
+  cuvs::detail::matrix_fill(
     handle, raft::make_device_vector_view<value_t, value_idx>(a_ptr, n_rows), value_t(0));
 
   dim3 block_size(std::min(n_rows, 32), std::min(n_labels, 32));

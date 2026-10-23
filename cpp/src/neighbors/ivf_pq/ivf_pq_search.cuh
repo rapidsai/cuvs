@@ -7,6 +7,7 @@
 
 #include "../../core/map_launchers.hpp"
 #include "../../core/nvtx.hpp"
+#include "../../core/radix_sorting_launchers.hpp"
 #include "../detail/ann_utils.cuh"
 #include "../ivf_common.cuh"
 #include "../sample_filter.cuh"  // none_sample_filter
@@ -499,27 +500,27 @@ void ivfpq_search_worker(raft::resources const& handle,
     int begin_bit             = 0;
     int end_bit               = sizeof(uint32_t) * 8;
     size_t cub_workspace_size = 0;
-    cub::DeviceRadixSort::SortPairs(nullptr,
-                                    cub_workspace_size,
-                                    clusters_to_probe,
-                                    cluster_labels_out.data(),
-                                    index_list,
-                                    index_list_sorted,
-                                    n_queries_probes,
-                                    begin_bit,
-                                    end_bit,
-                                    stream.get());
+    cuvs::detail::cub_sort_pairs(nullptr,
+                                 cub_workspace_size,
+                                 clusters_to_probe,
+                                 cluster_labels_out.data(),
+                                 index_list,
+                                 index_list_sorted,
+                                 n_queries_probes,
+                                 begin_bit,
+                                 end_bit,
+                                 stream.get());
     rmm::device_buffer cub_workspace(cub_workspace_size, stream, mr);
-    cub::DeviceRadixSort::SortPairs(cub_workspace.data(),
-                                    cub_workspace_size,
-                                    clusters_to_probe,
-                                    cluster_labels_out.data(),
-                                    index_list,
-                                    index_list_sorted,
-                                    n_queries_probes,
-                                    begin_bit,
-                                    end_bit,
-                                    stream.get());
+    cuvs::detail::cub_sort_pairs(cub_workspace.data(),
+                                 cub_workspace_size,
+                                 clusters_to_probe,
+                                 cluster_labels_out.data(),
+                                 index_list,
+                                 index_list_sorted,
+                                 n_queries_probes,
+                                 begin_bit,
+                                 end_bit,
+                                 stream.get());
   }
 
   // select and run the main search kernel

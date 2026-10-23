@@ -1,0 +1,23 @@
+[
+  {
+    "return_type": "float*",
+    "qualified_function": "cuvs::detail::thrust_gather",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "rmm::exec_policy_nosync const&, long*, long*, float const*, float*"
+      },
+      {
+        "parameter_types": "rmm::exec_policy_nosync const&, long*, long*, float*, float*"
+      }
+    ]
+  },
+  {
+    "return_type": "long*",
+    "qualified_function": "cuvs::detail::thrust_gather",
+    "template_arguments": "",
+    "parameter_types": "rmm::exec_policy_nosync const&, long*, long*, long*, long*",
+    "function_qualifiers": ""
+  }
+]

@@ -3,8 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
+#include "../../core/cub_runtime_launchers.hpp"
 
 #include "../../core/map_launchers.hpp"
+
+#include "../../core/gather_launchers.hpp"
 #include "../../core/matrix_broadcast_launchers.hpp"
 #include "../../distance/distance.cuh"
 #include "../../distance/top_1_nn.cuh"
@@ -389,16 +392,12 @@ void sampleCentroids(raft::resources const& handle,
   raft::resource::sync_stream(handle);
 
   uint8_t* rawPtr_isSampleCentroid = isSampleCentroid.data_handle();
-  thrust::for_each_n(raft::resource::get_thrust_policy(handle),
-                     sampledMinClusterDistance.data_handle(),
-                     nPtsSampledInRank,
-                     [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> val) {
-                       rawPtr_isSampleCentroid[val.key] = 1;
-                     });
+  cuvs::detail::mark_sampled_centroids(
+    handle, sampledMinClusterDistance.data_handle(), nPtsSampledInRank, rawPtr_isSampleCentroid);
 
   inRankCp.resize(nPtsSampledInRank * n_features, stream);
 
-  raft::matrix::gather((DataT*)X.data_handle(),
+  cuvs::detail::gather((DataT*)X.data_handle(),
                        X.extent(1),
                        X.extent(0),
                        sampledMinClusterDistance.data_handle(),
@@ -468,7 +467,7 @@ void shuffleAndGather(raft::resources const& handle,
                                                true,
                                                stream);
 
-  raft::matrix::gather((DataT*)in.data_handle(),
+  cuvs::detail::gather((DataT*)in.data_handle(),
                        in.extent(1),
                        in.extent(0),
                        indices.data_handle(),
