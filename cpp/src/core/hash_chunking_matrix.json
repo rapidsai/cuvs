@@ -1,0 +1,18 @@
+[
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::distance::detail::sparse::hash_strategy<int, double, 1024>::chunking_needed",
+    "template_arguments": "",
+    "parameter_types": "int const*, int, rmm::device_uvector<int>&, std::tuple<int, int>&, cudaStream_t",
+    "function_qualifiers": "",
+    "namespace_context": "cuvs::distance::detail::sparse"
+  },
+  {
+    "return_type": "void",
+    "qualified_function": "cuvs::distance::detail::sparse::hash_strategy<int, float, 1024>::chunking_needed",
+    "template_arguments": "",
+    "parameter_types": "int const*, int, rmm::device_uvector<int>&, std::tuple<int, int>&, cudaStream_t",
+    "function_qualifiers": "",
+    "namespace_context": "cuvs::distance::detail::sparse"
+  }
+]
