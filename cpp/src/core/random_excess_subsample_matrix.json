@@ -1,0 +1,34 @@
+[
+  {
+    "return_type": "auto",
+    "qualified_function": "cuvs::detail::random::excess_subsample",
+    "_variants": [
+      {
+        "template_arguments": "<int, int>",
+        "parameter_types": "raft::resources const&, raft::random::RngState&, int, int",
+        "function_qualifiers": " -> raft::device_vector<int, int>"
+      },
+      {
+        "template_arguments": "<int64_t, int64_t>",
+        "parameter_types": "raft::resources const&, raft::random::RngState&, int64_t, int64_t",
+        "function_qualifiers": " -> raft::device_vector<int64_t, int64_t>"
+      }
+    ]
+  },
+  {
+    "return_type": "auto",
+    "qualified_function": "raft::random::detail::excess_subsample",
+    "_variants": [
+      {
+        "template_arguments": "<int, int>",
+        "parameter_types": "raft::resources const&, raft::random::RngState&, int, int",
+        "function_qualifiers": " -> raft::device_vector<int, int>"
+      },
+      {
+        "template_arguments": "<int64_t, int64_t>",
+        "parameter_types": "raft::resources const&, raft::random::RngState&, int64_t, int64_t",
+        "function_qualifiers": " -> raft::device_vector<int64_t, int64_t>"
+      }
+    ]
+  }
+]
