@@ -1569,6 +1569,7 @@ if(NOT BUILD_CPU_ONLY)
   if(CUVS_CUTILE_ENABLED)
     target_sources(
       cuvs_objs
+    src/core/cub_ptx_query.cu
       PRIVATE ${cutile_fused_1nn_files}
               src/distance/detail/fused_distance_nn/cutile/fused_1nn_tile.cu ${cutile_smoke_files}
     )
