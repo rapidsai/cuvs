@@ -1,0 +1,22 @@
+[
+  {
+    "return_type": "cudaError",
+    "qualified_function": "cuvs::detail::cub_argmin",
+    "template_arguments": "",
+    "function_qualifiers": "",
+    "_variants": [
+      {
+        "parameter_types": "void*, unsigned long&, double*, cub::KeyValuePair<int, double>*, int, CUstream_st*"
+      },
+      {
+        "parameter_types": "void*, unsigned long&, double*, cub::KeyValuePair<int, double>*, long, CUstream_st*"
+      },
+      {
+        "parameter_types": "void*, unsigned long&, float*, cub::KeyValuePair<int, float>*, int, CUstream_st*"
+      },
+      {
+        "parameter_types": "void*, unsigned long&, float*, cub::KeyValuePair<int, float>*, long, CUstream_st*"
+      }
+    ]
+  }
+]
