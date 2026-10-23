@@ -377,7 +377,7 @@ void ace_get_partition_labels(
 
   // Sampling vectors from dataset. Uses float conversion on host instead of
   // raft::matrix::sample_rows to minimize GPU memory usage.
-  // TODO(julianmi): Switch to sample_rows when https://github.com/nvidia/cuvs/issues/1461 is
+  // TODO(julianmi): Switch to sample_rows when https://github.com/NVIDIA/cuvs/issues/1461 is
   // addressed.
   const size_t n_samples = ace_labeling_sample_count(dataset_size, n_partitions, sampling_rate);
   RAFT_LOG_DEBUG("ACE build: partition labeling uses %lu sampled vectors", n_samples);
